@@ -38,6 +38,7 @@ C
 C  This is the common interface for the following power-only components:
 C                ID = 17 (lead-acid battery)
 C                ID = 21 (VRB)
+C                ID = 22 (Li-Ion)
 C
 C - The lead-acid battery model includes a crude thermal mass model of battery temperature
 C   evolution as well as an optional thermal management system composed of electric resistances
@@ -1271,8 +1272,8 @@ C           at the end of the time step
 
 C           Make sure the current does not exceed the maximum allowable current
             batCurrent = MIN(batCurrent,batMaxCur)
-         ENDIF  ! DOD
-      ELSE  !Discharge
+         ENDIF  ! Depth Of Discharge below lower limit
+      ELSE  ! Discharge
          IF ((DODEnd .GT. upperBoundDOD) .OR.
      &      (batCurrent>FreeVAvg/2.0/RIntAvg)) THEN
          ! DOD exceeds limit -> current too high   or

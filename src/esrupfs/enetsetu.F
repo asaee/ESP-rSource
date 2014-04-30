@@ -658,7 +658,8 @@ C Trace
 C Write out the calculated impedance values
           WRITE(ITU,*)' '
 
-          WRITE(ITU,*)' Calculated impedance values for component',ICCN
+          WRITE(ITU,*)' Calculated impedance values for '
+     &      ,'connecting component ',ICCN
           WRITE(ITU,*)' Component type',CONECOMID(ICCN)
           WRITE(ITU,*)' No. of calculated impedance values',NCONZ(ICCN)
           INC=2
@@ -679,7 +680,8 @@ C Write out the calculated impedance values
 
 C Error message
  1001 WRITE(OUTS,*) 
-     &'ERROR: ENETCBAZ incorrect no. of data items specified for conn '
+     &'ERROR: ENETCBAZ incorrect no. of data items specified for conn'
+     &,'ecting component '
      &,ICCN
       CALL EDISP(itu,outs)
       CALL EPWAIT
