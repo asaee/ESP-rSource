@@ -40,7 +40,8 @@ C            electrical network. The admittance is usually the inverse of the co
 C            impedance of the linkage between the nodes. However, when conductors are
 C            mutually coupled (i.e. overhead lines), the calculation of the admittance
 C            is more convoluted. All admittance values as calculated in PER-UNIT.
-C ENETADMY - calculates the self-admittance and branch admittances for each node            C            in the electrical network. 
+C ENETADMY - calculates the self-admittance and branch admittances for each node
+C            in the electrical network.
 C ENETPARAM- this routine allows the user to set up the electrical power flow solution
 C            parameters.
 C     

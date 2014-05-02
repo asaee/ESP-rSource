@@ -103,7 +103,7 @@ c     &     on_cost,   ! Cost of electricity in on  period ($/kWh)
 c     &     fuel_cost, ! Cost of cogen fuel ($/m^3)
 c     &     cost,      ! The cost of fuel based on the simulation timestep
  
-       real     house_load ! The house load in (W)
+      real     house_load ! The house load in (W)
 
 c      integer summ_month_s, ! The month that TOU summer pricing scheme begins
 c     &        summ_day_s,   ! The day that TOU summer pricing scheme begins

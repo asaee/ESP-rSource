@@ -913,7 +913,7 @@ C     charge cycle, because then the voltage is expected to surpass the batMaxVo
       IF (FreeVoltage .GT. batMaxVolt) THEN
         if (mandChargeCycle .NE. 1) then
           WRITE(IUOUT,*) 'Warning Battery Model: Free voltage above ',
-     &                  ' max in function FreeVoltage', (NSINC)
+     &                  'max in function FreeVoltage', (NSINC)
           FreeVoltage = batMaxVolt
         endif
       ELSEIF(FreeVoltage .LT. batMinVolt) THEN
