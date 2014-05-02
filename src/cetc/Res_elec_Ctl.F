@@ -134,7 +134,11 @@ c      wint_day_s = 1
 c      wint_month_e = 2 ! Winter ends on Nov 28
 c      wint_day_e = 28
       
-      batDemandP_Lion = -825.-house_load
+        batDemandP = -825.-house_load
+
+C       Demand in Watts imposed on the battery
+C       +ve indicates discharging the battery, -ve charge
+cx        batDemandP = 825.
 
 C If the house demand is above a certain value, evaluate
 C which is cheaper to supply it: the cogen system or the

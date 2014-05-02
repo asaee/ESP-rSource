@@ -232,8 +232,7 @@ C     is not considered. It is put here for the reference of future improvement.
 
       ELSEIF(POWCOMID(IPWC) .EQ. lion) THEN !Lithium-ion battery
          iZoneIndex = INT(powcdat(IPWC,72))
-         batDemandP = batDemandP_Lion !This is to read the battery load specificied
-                                      !Specifically by Res_elec_Ctl.F
+
 C-----Add support for other battery types
 C     ELSEIF (POWCOMID(IPWC) .EQ.??) THEN
       ENDIF
@@ -339,7 +338,7 @@ C       This should not be possible !!
      &                dtTStep,maxPBatCharge)
         batLoad = ChargePower
 
-      ENDIF
+      ENDIF ! (mandChargeCycle .NE. 1)
 
 C-------Assign maxPBatCharge and maxPBat Discharge to a common block variable
 C-------so that the maximum charge rate and maximum discharge rate
@@ -633,7 +632,7 @@ C ************** Initialisation
        batTempInit = POWCDAT(IPWC,9)
        batDODInit = POWCDAT(IPWC,10)
 
-       IF( POWCOMID(IPWC) .EQ. 17) THEN      ! Lead-acid battery
+       IF( POWCOMID(IPWC) .EQ. pba) THEN      ! Lead-acid battery
          lifeUseFactor = 0
          batLifeUsed = 0.
          cumBatLifeUsed = 0.

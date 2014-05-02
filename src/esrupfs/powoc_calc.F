@@ -239,6 +239,12 @@ C-------------------------------------------------------------------------------
       COMMON/ENETPOWC/PPOWOC(MPOWCOM),QPOWOC(MPOWCOM),
      &VPOWC(MPOWCOM)
 
+C---------------------------------------------------------------------------------
+C Common created by Neil Saldanha for customized controller with SE and lithium
+C ion battery (see his thesis for more info)
+C---------------------------------------------------------------------------------
+      common/Res_elec_ctl/house_load
+
 
 C---------------------------------------------------------------------------------
 C Declarations for common block variables.
@@ -246,7 +252,7 @@ C-------------------------------------------------------------------------------
       INTEGER      NPOWCOM, POWCOMNO, POWCOMID, POWCOMPHTYP, POWCONEN,
      &             NPOWCDAT, NPOWCDATS
       REAL         POWCDAT
-      REAL         PPOWOC, QPOWOC
+      REAL         PPOWOC, QPOWOC, house_load
       COMPLEX      VPOWC
 
       CHARACTER*12 ENODNAM, HYCOMTYPSTR, HYCOMNAM, POWCOMNAM,CONECOMNAM
@@ -271,6 +277,7 @@ C.....Recover loads
       PPOWOC(IPWC) = -1.* fGet_nonHVACld ( cFile_Name ) * fScale_Factor
       QPOWOC(IPWC) = 0.
 
+      house_load = PPOWOC(IPWC) ! Store dwelling house load for custom controller (see common block declaration above)
 
       RETURN
       END
@@ -742,19 +749,12 @@ C-------------------------------------------------------------------------------
       common/dllerr/dllsubr, dllmesg
 
 C---------------------------------------------------------------------------------
-C Common created by Neil Saldanha for customized controller with SE and lithium
-C ion battery (see his thesis for more info)
-C---------------------------------------------------------------------------------
-      common/Res_elec_ctl/house_load
-
-
-C---------------------------------------------------------------------------------
 C Declarations for common block variables.
 C---------------------------------------------------------------------------------
       INTEGER      NPOWCOM, POWCOMNO, POWCOMID, POWCOMPHTYP, POWCONEN,
      &             NPOWCDAT, NPOWCDATS
       REAL         POWCDAT
-      REAL         PPOWOC, QPOWOC, house_load
+      REAL         PPOWOC, QPOWOC
       COMPLEX      VPOWC
       INTEGER      IHRP, IHRF, IDYP, IDYF, IDWP, IDWF, NSINC, ITS
       REAL         btimep, btimef, ptimep, ptimef
@@ -812,9 +812,6 @@ C Power only components
 
       PPOWOC(IPWC) = -1. * q_nonHVAC_elec * POWCDAT(IPWC,1)
       QPOWOC(IPWC) = 0.
-
-      house_load = PPOWOC(IPWC) ! Store dwelling house load for custom controller (see common block declaration above)
-
 
       RETURN
       END
