@@ -1,11 +1,11 @@
 C-----------------------------------------------------------------------------------------
-C This is a customized controller for purposes of modelling a lithium ion battery coupled
-C with a micro-cogeneration device and the electric grid.  Unlike conventional ESP-r controllers
-C this controller senses the state of numerous plant and electrical domain components
-C and actuates numerous plant and electrical domain components.  Its structure is highly
-C customized to a specific system configuration.  It is anticipated that in the future a
-C more generalized control structure will be established to provide this functionality
-C and thus supplant this controller.
+C This is a customized controller for purposes of modelling electrical nets featuring
+C a battery and (typically) PV in models also using explicit plants for HVAC.
+C Unlike conventional ESP-r controllers this controller can sense the state of
+C numerous plant and electrical domain components and can actuate numerous plant and
+C electrical domain components.
+C
+C The structure of this controller is customized to quite specific system configurations.
 C
 C This controller is invoked from ENETSOLV at the beginning of the execution of the
 C electric domain.  Consequently, it senses the state of electric domain components
@@ -13,24 +13,46 @@ C from the previous solution of the electric domain.  If bps is iterating within
 C time-step between the plant and electrical domains to converge a solution, then the
 C controller is sensing the state of the electric domain components at the current
 C time-step.  Otherwise, if this is the first pass through the electric domain for the
-C current time-step then the controller is sensing the state of electric domain components
-C at the previous time-step.  Since the plant domain is solved prior to the invocation
-C of the electric domain, the controller is sensing the state of plant components at the
-C current time-step.
+C current time-step then the controller is sensing the state of electric domain
+C components at the previous time-step.
+C
+C Since the plant domain is solved prior to the invocation of the electric domain,
+C the controller is sensing the state of plant components at the current time-step.
 C
 C The controller actuates a number of plant domain components.  If one of these control
 C actions results in a different operational mode for a plant component, a flag is set
 C that forces another iteration through the plant and electric domains at the current
 C time-step.
 C
-C This is adapted from src/cetc/RE-H2-ctl.F
-C For more information on the strategies see Neil Saldanha, Carleton U's master thesis
+C This controller is adapted from src/cetc/RE-H2-ctl.F
+C For more information on the control strategies see
+C   1.
+C   X. Neil Saldanha, Carleton U's master thesis <<Li-Ion Battery model, mainly>>
+C
+C-----------------------------------------------------------------------------------------
+C Subroutines
+C
+C  Res_elec_storage_ctl:   The main control routine. This routine is called in
+C                          esrupfs/enetsolv.F, subroutine ENETSOLV and manages the control
+C                          schemes available.
+C
+C  simple_ctl              Basic (simple) control ...
+C
+C  low_cost                Control based on algorithm to minimise cost. Reads time step
+C                          data on electricity costs from an external file ...
+C
+C  thermal_follow          Control based on ...
+C
 C-----------------------------------------------------------------------------------------
 
       SUBROUTINE Res_elec_storage_ctl
       IMPLICIT NONE
       integer ctl_mode
-      
+
+C << lion battery behaviour very questionable for short time steps -
+C    must a time step integration/lag occur for timesteps below a certain
+C    threshold value ?? >>
+
 C Control Mode Declaration
       ctl_mode = 2
 C This dictates which of the following algorithms to follow
@@ -46,7 +68,10 @@ C = 3 : Thermal following strategy control. See thermal_follow subroutine below
       elseif (ctl_mode .eq. 3) then
         call thermal_follow      !call up thermal following control
       else                       !do nothing and exit this subroutine
+
       endif
+
+
       END ! End main subroutine
 
 

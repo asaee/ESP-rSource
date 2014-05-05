@@ -4438,22 +4438,18 @@ C         The needed energy in watts to return to safe points
      &                   'Convergeance in Lion_BMS hiVoltage flag'
         ENDIF
 
-        IF (batMode_or .NE. 1) THEN ! Originally in charge or idle mode, cant happen
-                                    ! to bring into safe limits
-
-C         Re-evaluate the max current and power that you could discharge now that you changed modes
+        IF (batMode_or .NE. 1) THEN
+C         Originally in charge or idle mode. Re-evaluate the max current
+C         and power that you could discharge now that you changed modes
           maxC = MaxCurrent(IPWC,batTIni,DODIni,batMode,dtTStep)
           maxP = PowForCur(IPWC,batTIni,DODIni,batMode,dtTStep,
      &                             maxC)
+        endif
 
-        ELSE ! Battery in discharge or idle determine how much excess power the batt needs to dump
+        IF (pLoad_or .GE. pLoad) THEN ! What can be offered exceeds what needs to be dumped
+          pLoad = pLoad_or !assign load back to original because it is enough to safely return battery
 
-          IF (pLoad_or .GE. pLoad) THEN ! What can be offered exceeds what needs to be dumped
-            pLoad = pLoad_or !assign load back to original because it is enough to safely return battery
-
-          ELSE ! What can be offered doesn't exceed and some will dump to the grid
-
-          ENDIF
+        ELSE ! What can be offered doesn't exceed and some will dump to the grid
 
         ENDIF
 
@@ -4489,9 +4485,9 @@ C safe limits
 
 C         Re-evaluate the max current and power that you could discharge now that you changed modes
           maxC = MaxCurrent(IPWC,batTIni,DODIni,batMode,dtTStep)
-          maxP = PowForCur(IPWC,batTIni,DODIni,batMode,dtTStep,
-     &                             maxC)
+          maxP = PowForCur(IPWC,batTIni,DODIni,batMode,dtTStep,maxC)
 
+C << logic most likely also flawed, as with hiVolt above ... >>
         ELSE ! Battery in charge or idle determine how much excess power the batt needs to charge
 
           IF (pLoad_or .GE. pLoad) THEN ! What can be offered exceeds what needs to be dumped
