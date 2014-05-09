@@ -104,7 +104,6 @@ cx        batDemandP = -300
 
 cx      ENDIF
 
-
       END ! End simple control algorithm
 
 
