@@ -103,8 +103,8 @@ unversioned="no"           # Check svn for versioning info?
 #-----------------------------------------------------------
 
 DATdir="${HOMEdir}/data"
-CLMdir="${DBSdir}/climate"
-DBSdir="${DBSdir}/databases"
+CLMdir="${DATdir}/climate"
+DBSdir="${DATdir}/databases"
 MODdir="${HOMEdir}/models"
 TRAdir="${MODdir}/training"
 VALdir="${MODdir}/validation"
@@ -1830,6 +1830,9 @@ echo -n "${VersioningScheme})..."
 # Now write a gnome desktop file so an icon can be used to start prj
 # other variants may be required for other display managers
 #--------------------------------------------------------------
+# Delete prior to writing anew, as it seems to be appended ...
+  rm ${HOME}/esp-r.desktop
+
   echo "       "                                                          >> ${HOME}/esp-r.desktop
   echo "[Desktop Entry]"                                                  >> ${HOME}/esp-r.desktop
   echo "Version=1.0"                                                      >> ${HOME}/esp-r.desktop
