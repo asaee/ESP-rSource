@@ -85,7 +85,7 @@ C-------------------------------------------------------------------------------
 #include "BATTERY.h"
 
 C This is the demand in Watts imposed on the battery
-      batDemandP_Lion = 4.3
+      batDemandP = 4.3
 C +ve indicates discharging the battery, -ve charge
 
       END ! End simple control algorithm
