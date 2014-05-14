@@ -95,6 +95,12 @@ C The electrical network
 
       integer ENTYPE
 
+C Simulation time and timestep.
+      COMMON/ENETDELTAT/IETSET,ENETSTP
+      
+      integer ietset
+      real enetstp
+
 C More network-related info
       COMMON/ENETMSC/PHASEANG(MPHAS)
 

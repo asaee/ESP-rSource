@@ -110,9 +110,6 @@ C Charge, idle and trip duration counters.
 C Data recording for the vehicle. 
 c      COMMON/EVSTATE5/NO_TRIP(MPOWCOM),TOT_TRIP_DURATION(MPOWCOM)
 
-C Simulation time and timestep.
-      COMMON/ENETDELTAT/IETSET,ENETSTP
-
 C Initialization status of power-only components
       COMMON/ENETPOWCOMP/BCOMP_INITIALIZED(MPOWCOM)
 
@@ -546,8 +543,6 @@ C Statistical data to calibrate this model for the UK is available from the DfT
 C Trace Commons
       COMMON/TRACE/ITCF,ITRACE(MTRACE),IZNTRC(MCOM),ITU
 
-      COMMON/ENETDELTAT/IETSET,ENETSTP
-
       COMMON/EVSTATE1/EV_STATUSF(MPOWCOM),EV_STATUSP(MPOWCOM)
 
       COMMON/EVDATA2/ANNUAL_DIST(MPOWCOM),AVE_TRIP(MPOWCOM),
@@ -649,9 +644,6 @@ C 5 - co-operative charge when the battery discharged to keep load below a limit
 
 C Trace Commons
       COMMON/TRACE/ITCF,ITRACE(MTRACE),IZNTRC(MCOM),ITU
-
-C Simulation timestep.
-      COMMON/ENETDELTAT/IETSET,ENETSTP
 
       COMMON/EVSTATE1/EV_STATUSF(MPOWCOM),EV_STATUSP(MPOWCOM)
 
@@ -835,8 +827,6 @@ C The current state of the EV.
       COMMON/EVDATA6/BATTERY_CAP(MPOWCOM),KWH_KM(MPOWCOM),
      &KWH_HR(MPOWCOM),CHARGE_EFF(MPOWCOM),MIN_SOC(MPOWCOM),
      &PROB_CHARGE_MOD(MPOWCOM)
-
-      COMMON/ENETDELTAT/IETSET,ENETSTP
 
 C Charging control data.
       COMMON/EVDATA7/CHARGE_TYPE(MPOWCOM),CHARGE_KWH(MPOWCOM)
