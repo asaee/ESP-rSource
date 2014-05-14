@@ -55,7 +55,8 @@ C   + Various ESP-r plant domain common blocks defined below.
 C----------------------------------------------------------------------
       subroutine PFS_TimeRow_Manipulate(iOperation)
       implicit none
-
+#include "building.h"
+#include "plant.h"
 #include "power.h"
 #include "CETC_definitions.h"
 
@@ -67,17 +68,6 @@ C----------------------------------------------------------------------
 C----------------------------------------------------------------------
 C     ESP-r commons
 C----------------------------------------------------------------------
-C.....Power only components
-      common/powc/npowcom,powcomno(mpowcom),powcomid(mpowcom),
-     &   powcomphtyp(mpowcom),powconen(mpowcom,mphas),
-     &   npowcdat(mpowcom),npowcdats(mpowcom),powcdat(mpowcom,mpwdat)
-
-C.....# of power only components
-      integer nPowCom
-C.....Not used in current context
-      integer powcomno, powcomid, powcomphtyp, powconen, npowcdat,
-     &        npowcdats
-      real powcdat
 
 C.....Hybrid component electrical time-row data:
       common / Enet_Power_Time_Row_Data /

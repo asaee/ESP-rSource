@@ -25,8 +25,9 @@ C time-step.
 C-----------------------------------------------------------------------------------------
       SUBROUTINE RESH2_Ctl
       IMPLICIT NONE
-#include "power.h"
+#include "building.h"
 #include "plant.h"
+#include "power.h"
 #include "BATTERY.h"
 
 
@@ -46,23 +47,6 @@ C Common block storing electrical domain time-row data for additional data items
       integer iPow_Time_Row_Count ( MPOWCOM ) ! # of additional data items associated with power-only component.
       real fPow_Time_Row_Present ( MPOWCOM, MEnet_Time_Row_MAX ) ! Component present time-row data
       real fPow_Time_Row_Future ( MPOWCOM, MEnet_Time_Row_MAX ) ! Component future time-row data
-
-C Common block storing load, generation, and transmission at elec domain nodes.
-      COMMON/ENODLGT/PENODL(MENOD),QENODL(MENOD),
-     &PENODG(MENOD),QENODG(MENOD),PENODT(MENOD),QENODT(MENOD)
-      real    penodl         !- real power load on node
-      real    qenodl         !- reactive power load on node
-      real    penodg         !- real power generation at node
-      real    qenodg         !- reactive power generation at node
-      real    penodt         !- real transmitted power at node
-      real    qenodt         !- reactive transmitted power at node
-
-C Common block storing power load/generation and voltage of elec domain powoc's.
-      COMMON/ENETPOWC/PPOWOC(MPOWCOM),QPOWOC(MPOWCOM),
-     &VPOWC(MPOWCOM)
-      real    ppowoc         !-real power generated/load for power-only component
-      real    qpowoc         !-reactive power generated/load for power-only component
-      complex vpowc          !-voltage of power only component
 
 C Common block storing control and other data for plant components.
       COMMON/C9/NPCOMP,NCI(MPCOM),CDATA(MPCOM,MMISCD)
@@ -739,6 +723,7 @@ C-------------------------------------------------------------------------------
 
       SUBROUTINE RESH2_Ctl_Read
       IMPLICIT NONE
+#include "building.h"
 #include "plant.h"
 #include "power.h"
 
@@ -1148,6 +1133,8 @@ C----------------------------------------------------------------------
       subroutine RESH2_Ctl_PostProcess()
       use h3kmodule
       implicit none
+#include "building.h"
+#include "plant.h"
 #include "power.h"
 #include "BATTERY.h"
 C Input file information
@@ -1171,17 +1158,6 @@ C Flags indicating status of controller
       logical bPV_active,bElectrolyzer_active,bPEM_active,
      &                    bBattery_charge, bBattery_discharge
 
-
-
-C Common block storing load, generation, and transmission at elec domain nodes.
-      COMMON/ENODLGT/PENODL(MENOD),QENODL(MENOD),
-     &PENODG(MENOD),QENODG(MENOD),PENODT(MENOD),QENODT(MENOD)
-      real    penodl         !- real power load on node
-      real    qenodl         !- reactive power load on node
-      real    penodg         !- real power generation at node
-      real    qenodg         !- reactive power generation at node
-      real    penodt         !- real transmitted power at node
-      real    qenodt         !- reactive transmitted power at node
 
 C 'Network interaction'
       real fNetworkBalance
