@@ -699,10 +699,6 @@ C ------------------------------------------------------------------------------
       INTEGER NPEL,IPFP(mpcom),IPHP(mpcom)
       REAL PFP(mpcom),PWRP(mpcom),BVOLTP(mpcom)
 
-      COMMON/ENTFILE/ENTFLNAM, IENTXIST
-      CHARACTER*72 ENTFLNAM  ! Electrical networks filename.
-      INTEGER IENTXIST       ! Elec netowrks flag. True if > 0
-
 C The COMMON variables below are used by the modified fuel cell model when
 C it is connected to an adsorption storage unit.
 
