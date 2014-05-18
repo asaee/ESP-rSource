@@ -97,7 +97,7 @@ C The electrical network jacobian solution matrix
       COMMON/ENETMTRX/JACOBEL(MJROW,MJCOL),EMATJZ(MJROW),
      &EDELTA(MJROW)
 
- C Initialization status of power-only components
+C Initialization status of power-only components
       COMMON/ENetPowComp/bComp_initialized
       logical bComp_Initialized(MPOWCOM)
 
@@ -105,8 +105,7 @@ C The electrical network jacobian solution matrix
       INTEGER ENETMAXI,ENETSLVT,
      &ENODCVGF,ISD1,ISM1,ISD2,ISM2,ISDS,ISDF,NTSTEP,NTSTPP
 
-      REAL RADPHA,ENETACVG,
-     &ENETVLIM,ENETVCVG,ENETSTP
+      REAL RADPHA,ENETACVG,ENETVLIM,ENETVCVG
 
       DOUBLE PRECISION JACOBEL,EMATJZ,EDELTA
 
