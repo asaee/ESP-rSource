@@ -87,8 +87,8 @@ C========================================================================
 C Common for electrical file 
       COMMON/ENTFILE/ENTFLNAM,IENTXIST
 
-      integer      IENTXIST  ! Elec netowrks flag. True if > 0
-      character*72 ENTFLNAM
+      character  ENTFLNAM*72
+      integer    IENTXIST     ! Elec netowrks flag. True if > 0
 
 C The electrical network
       COMMON/ENET/ENTYPE
