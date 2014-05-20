@@ -87,8 +87,8 @@ C========================================================================
 C Common for electrical file 
       COMMON/ENTFILE/ENTFLNAM,IENTXIST
 
-      integer      IENTXIST
-      character*72 ENTFLNAM
+      character  ENTFLNAM*72
+      integer    IENTXIST     ! Elec netowrks flag. True if > 0
 
 C The electrical network
       COMMON/ENET/ENTYPE
@@ -411,9 +411,9 @@ C Special materials
       COMMON/ENETSPM/PSPM(MSPMNOD),QSPM(MSPMNOD),
      &VSPM(MSPMNOD)
 
-      real PSPM
-      real QSPM
-      complex VSPM
+      real pspm			!- real power of special material
+      real qspm			!- reactive power load/generation of special material
+      complex vspm		!- voltage of special material node
 
 C The connected hybrid components
       COMMON/HYBE/NHYBCOM,HYBCOMNO(MHYCOM),HYCOMTYP(MHYCOM),
