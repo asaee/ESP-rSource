@@ -97,7 +97,7 @@ C EENOD        - end node(s)
 C
 C *********************************************************************
       SUBROUTINE ENETREAD(MODE)
-
+      implicit none
 #include "building.h"
 #include "plant.h"
 #include "power.h"
@@ -130,7 +130,8 @@ C Type casting (all varaiables and arrays cast explicitly)
 
       INTEGER IUOUT,IUIN,IFIL,IEUNIT,IVAL,I,J,IPHV,K,
      &INODE,IHYB,IPWC,IPCDS,ICNC,ICON,ILOCT,IPHN,IDLC,INC
-     
+      integer IER,ND,IVPC,IPH
+
       REAL BIG, VAL,RVHY,RVPC,RVCC
 
       real fENFVersionNum         !- version number of electrical network file

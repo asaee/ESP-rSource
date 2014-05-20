@@ -636,7 +636,7 @@ C ------------------------------------------------------------------------------
 #include "building.h"
 #include "CETC_definitions.h"
 #include "SOFC.h"
-
+#include "power.h"
 
       COMMON/OUTIN/IUOUT,IUIN
       INTEGER  IUOUT,IUIN
