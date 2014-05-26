@@ -124,7 +124,7 @@ C         Demand in Watts imposed on the battery
 C         -ve indicates discharging the battery, +ve charge <<???>>
           batDemandP = -300
 
-      ENDIF
+        ENDIF
 
    10 continue
 
