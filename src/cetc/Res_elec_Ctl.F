@@ -49,28 +49,47 @@ C
 C  RES_elec_ctl_PostProcess() Writes output to h3k (currently not activated)
 C
 C-----------------------------------------------------------------------------------------
-
       SUBROUTINE RES_elec_storage_ctl
       IMPLICIT NONE
+
+C Input file information
+      common/reselecctl/ireselecctl,reselecflnam
+      integer ireselecctl       !- flag indicating that file required by renewable energy
+                                !- system controller is specified
+      character*72 reselecflnam !- name of file containing renewable energy system
+                                !- controller inputs
+
+      common / reselec_ctl_status / bRESElec_ctl_unconverged
+      logical bRESElec_ctl_unconverged         !-logical flag indicating additional iterations req'd
 
 C Basic RES (elec) controller inputs
       common/reselec/RES_elec_ctl_mode
       integer   RES_elec_ctl_mode ! control mode 1, 2 or 3, currently only 2 is coded
 
-C << lion battery behaviour very questionable for short time steps -
-C    must a time step integration/lag occur for timesteps below a certain
-C    threshold value ?? >>
+C-----------------------------------------------------------------------------------------
+C     Check if controller is in use
+C-----------------------------------------------------------------------------------------
+      if ( iResElecCtl .ne. 1 ) then
+C........Controller is not in use. Set flag preventing iteration
+         bResElec_ctl_unconverged = .false.
+      else ! closes at end of subroutine!
+C........Controller is in use.
 
+C <<   lion battery behaviour very questionable for short time steps -
+C      must a time step integration/lag occur for timesteps below a certain
+C      threshold value ?? >>
 
-      if (RES_elec_ctl_mode .eq. 1) then
-        call simple_ctl          ! call up constant power draw
-      elseif (RES_elec_ctl_mode .eq. 2) then
-        call low_cost            ! call up low cost
-      elseif (RES_elec_ctl_mode .eq. 3) then
-        call thermal_follow      ! call up thermal following control
-      else                       
-        ! <<shouldn't be possible>> do nothing and exit this subroutine
-      endif
+        if (RES_elec_ctl_mode .eq. 1) then
+          call simple_ctl          ! call up constant power draw
+        elseif (RES_elec_ctl_mode .eq. 2) then
+          call low_cost            ! call up low cost
+        elseif (RES_elec_ctl_mode .eq. 3) then
+          call thermal_follow      ! call up thermal following control
+        else                       
+          ! <<shouldn't be possible>> do nothing and exit this subroutine
+        endif
+
+      else
 
       END ! End main subroutine
 
