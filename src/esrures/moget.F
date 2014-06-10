@@ -2173,7 +2173,7 @@ C Report flux/m^2.
           IGETNO(NGET,1)=25
           IGETNO(NGET,6)=-104
           IGETNO(NGET,7)=10
-          SUFFIX=' ExSolAb'
+          SUFFIX=' ExSolIn'
           if(IROC.eq.0)then
             if (ISM.eq.0) then
               SLABEL(NGET)='Surface solar incid outside (W)'
