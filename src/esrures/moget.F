@@ -2179,6 +2179,7 @@ C Report flux/m^2.
               SLABEL(NGET)='Surface solar incid outside (W)'
               LNSLABEL(NGET)=31
             else
+              IGETNO(NGET,8)=3 ! see unit code in table.F, line 447 ff. **?
               SLABEL(NGET)='Surf solar incid outside (W/m^2)'
               LNSLABEL(NGET)=32
             endif
