@@ -65,22 +65,6 @@ C     Passed variables
 C----------------------------------------------------------------------
       integer iOperation       ! type of operation to be performed
 
-C----------------------------------------------------------------------
-C     ESP-r commons
-C----------------------------------------------------------------------
-
-C.....Hybrid component electrical time-row data:
-      common / Enet_Power_Time_Row_Data /
-     &    iPow_Time_Row_Count,
-     &    fPow_Time_Row_Present,
-     &    fPow_Time_Row_Future
-
-C.....# of additional data items associated with power-only component.
-      integer iPow_Time_Row_Count ( MPOWCOM )
-C.....Component present time-row data
-      real fPow_Time_Row_Present ( MPOWCOM, MEnet_Time_Row_MAX )
-C.....Component future time-row data
-      real fPow_Time_Row_Future ( MPOWCOM, MEnet_Time_Row_MAX )
 
 C----------------------------------------------------------------------
 C     Local variables
