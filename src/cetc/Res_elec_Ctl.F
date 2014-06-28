@@ -75,7 +75,7 @@ C........Controller is not in use. Set flag preventing iteration
       else ! closes at end of subroutine!
 C........Controller is in use.
 
-C <<   lion battery behaviour very questionable for short time steps -
+C <<   lion (and pba) battery behaviour very questionable for short time steps -
 C      must a time step integration/lag occur for timesteps below a certain
 C      threshold value ?? >>
 
@@ -86,10 +86,14 @@ C      threshold value ?? >>
         elseif (RES_elec_ctl_mode .eq. 3) then
           call thermal_follow      ! call up thermal following control
         else                       
-          ! <<shouldn't be possible>> do nothing and exit this subroutine
+          ! <<shouldn't be possible, i.e. should be cought during read of input file >>
+C         Give warning and exit this subroutine
+          write(outstr,'(2A)') 'Renewable energy system (elec)',
+     &       ' undefined control mode was entered -- no control!'
+          call edisp(iuout,outstr)
         endif
 
-      else
+      endif ! iResElecCtl .ne.1
 
       END ! End main subroutine
 
@@ -206,12 +210,19 @@ c       COMMON/PCTIME/TIMSEC
 c       REAL    TIMSEC          !-length of time increment (second)
 
 C---- local variables ---------------------------------------------------
-      real hvacl, occupantl
-      real PVgen          ! PV generation this time step, W
-      real P_total_load   ! sum of all loads this time step, W
-      real P_capacity     ! power-capacity of battery available for this time step
-      real P_available    ! power available from battery for this time step
-      real P_residual     ! difference between PV and P_total_load
+      real hvacl
+      real occupantl
+      real P_total_load       ! sum of all loads this time step, W
+      real P_capacity         ! power-capacity of battery available for this time step
+      real P_available        ! power available from battery for this time step
+      real P_residual         ! difference between PV and P_total_load
+      real batDODMax          ! Maximum depth of discharge
+      real fBatDemandP_old    !
+
+      REAL PV_power_to_DCbus  ! PV-produced power that is added to DC bus (W).
+      REAL load_ACbus              ! Power load on AC bus (W).
+      REAL DCAC_eff                ! Efficiency of DC-AC converter.
+      REAL SOC_battery        ! battery state of charge.
 
 CCC   ... these two need to be replaced by appropriate variables from
 CCC       the electrical net ...
@@ -225,44 +236,120 @@ CCC       the electrical net ...
       logical bGridRefundHigh ! flag .true. if exporting to grid has 'high rate'
       logical bGridRateLow    ! flag .true. if importing from grid is 'cheap'
 
+      logical DEBUG
+      DEBUG = .true.          ! toggle debug mode
+
 C---- function definitions ----------------------------------------------
 
       real elec_net_load_calc   ! miscellaneous function that retuns data
                                 ! from electrical network depending on the
                                 ! integer parameter passed to it.
 
+C---- Initiate variables according to battery type ----------------------
+      IF( POWCOMID(IPWC) .EQ. pba) THEN      ! Lead-acid battery
+        batDODMax = POWCDAT(IPWC_battery,48)
+      ELSEIF(POWCOMID(IPWC) .EQ. vrb) THEN   ! VRB
+cx        batDODMax = ??
+      ELSEIF(POWCOMID(IPWC) .EQ. lion) THEN !Lithium-ion battery
+        batDODMax = POWCDAT(IPWC_battery,14)
+      ENDIF
+
 C     Depth of discharge '0' with tolerance 0.001 is viewed as "full"
       call eclose(batDODFin,0.,0.001, bBatteryFull)
 
-C     Depth of discharge '0.85' is considered "empty"
-      if (batDODFin .gt. 0.85) then
+C     Depth of discharge for which battery is considered "empty"
+      if (batDODFin .gt. batDODMax) then
         bBatteryCharged = .false.
       else
         bBatteryCharged = .true.
       endif
 
+C----------------------------------------------------------------------------------------
+C     Save battery data from last call
+C----------------------------------------------------------------------------------------
+
+      fBatDemandP_old = batDemandP
+
+C-----------------------------------------------------------------------------------------
+C Sense power generation from PCU that is connected between PV and DC bus.  This
+C is the PV-produced power that is added to the DC bus.  This is the value at the
+C previous iteration through the electric domain (perhaps the same time-step).
+C IPWC_PVPCU is the index number of the PCU powoc (i.e. the sensed component in the
+C electrical domain).
+C-----------------------------------------------------------------------------------------
+
+cx    << how to consider 3phase PV setup?? >>
+      PV_power_to_DCbus = fPow_Time_Row_Future(IPWC_PVPCU,1)
+
+
+C-----------------------------------------------------------------------------------------
+C Sense the loading on the AC bus from the previous iteration.
+C IENOD_ACbus is the node number of the AC bus.
+C The load or generation of the grid-connection powoc model should be excluded.
+C IPWC_gridconn is the index number of the grid-connection powoc.
+C
+C Note: the function Elec_Net_Load_Calc cannot be used to evaluate the load
+C on the AC bus because this function sums the loads and generation
+C for all powoc and hybrid components on the entire electrical network.  In this case
+C I want to evaluate only the loading on a single node. << ? is that the case, here >>
+C-----------------------------------------------------------------------------------------
+
+      load_ACbus = ABS(PENODL(IENOD_ACbus))
+C                                - PPOWOC(IPWC_gridconn) ! - for load; UNCOMMENT WHEN GRID CONNECTED COMPONENT ADDED
+
+C-----------------------------------------------------------------------------------------
+C Determine how much power was required (at the previous iteration) to be supplied
+C by the DC bus to the AC-DC converter to meet the load on the AC bus.
+C
+C This is not necessarily how much power flowed along this path because there may
+C have been grid interaction on the AC bus.
+C
+C IPWC_ACDC is the index number of the AC-DC converter PCU powoc.
+C-----------------------------------------------------------------------------------------
+
+      DCAC_eff = fPow_Time_Row_Future(IPWC_ACDC,2)    ! Eff of DC-AC converter.
+
+      if ( DCAC_eff .eq. 0. ) then
+        DCAC_eff = 1.   ! avoid divide by zero error if DC/AC inverter is idle
+      endif
+
+      power_DC_to_AC_required = load_ACbus / DCAC_eff
+
+C-----------------------------------------------------------------------------------------
+C Determine the battery's SOC at the previous iteration and establish the
+C following:
+C  1) If there is excess PV-produced power on the DC bus whether this
+C     power will be directed to the battery or to the grid.
+C  2) If there is a deficit of PV-produced power on the DC bus whether
+C     the battery or the grid will supply the deficit.
+C-----------------------------------------------------------------------------------------
+
+      SOC_battery = fPow_Time_Row_Future(IPWC_battery,1)
+
+
 C*** DEBUG ===
-      write(*,*)'bBatteryFull=',bBatteryFull,', bBatteryCharged=',
-     &   bBatteryCharged,', batDODFin=',batDODFin
+      if (DEBUG) then
+        write(*,*)'bBatteryFull=',bBatteryFull,', bBatteryCharged=',
+     &     bBatteryCharged,', batDODFin=',batDODFin
+      endif
 C =====
 
-      bGridRateLow    = .false.  ! these should be taken from input
-      bGridRefundHigh = .true.   ! file with grid rates ...
+      bGridRateLow    = .false.  ! these should be based on values in
+      bGridRefundHigh = .true.   ! input file with grid rates ...
 
       P_capacity = 10. ! << get from battery, somehow ... >>
 
-C---- building loads this time step (W) --------------
+C---- Overall building loads this time step (W) --------------
       hvacl = elec_net_load_calc(hvac_load)
       occupantl = elec_net_load_calc(occupant_load)
 
       P_total_load = hvacl + occupantl
 
-C---- PV generation this time step (W) ---------------
-      PVgen = ABS(elec_net_load_calc(total_gen))
-
 C*** DEBUG ===
-      write(*,*)'hvacl=',hvacl,', occupantl=',occupantl,
-     &   ', PVgen=',PVgen
+      if (DEBUG) then
+        write(*,*)'hvacl=',hvacl,', occupantl=',occupantl,
+     &     ', PVgen=',PVgen
+      endif
 C ====
 
 C     Demand in Watts imposed on the battery
@@ -277,11 +364,11 @@ cx      endif
 
 C--- Begin control logic
 
-      if (PVgen .gt. 0) then
+      if (PV_power_to_DCbus .gt. 0) then
 C     PV generation available (W)
-        if (PVgen .ge. P_total_load) then
+        if (PV_power_to_DCbus .ge. P_total_load) then
 
-          P_available = PVgen - P_total_load ! (W)
+          P_available = PV_power_to_DCbus - P_total_load ! (W)
 
 C         Is battery fully charged or can it take some additional charging?
           if (bBatteryFull) then
@@ -523,7 +610,7 @@ C 3            # (3)  index number of PCU that is connected between the PV and t
 C 5            # (4)  index number of the grid-connection power-only component
 C 6            # (5)  index number of the DC-AC converter (a PCU power-only component)
 C 2            # (6)  index number of the battery power-only component
-C 1            # (7)  index number of the electrolyzer plant component
+C 1            # (7)  index number of the heat pump plant component
 C 125          # (8)  battery SOC at which PV is used
 C 100          # (9)  battery SOC at which PV use is ended
 C -20          # (10) battery SOC at which grid is used
@@ -817,6 +904,9 @@ C Flags indicating status of controller
 C 'Network interaction'
       real fNetworkBalance
 
+      logical DEBUG
+      DEBUG = .true.  ! toggle debug mode
+
 C Return if RESElec control not active.
       if ( iRESElecCtl .ne. 1 ) return
 
@@ -834,7 +924,11 @@ C network balance of the AC node (node 3) using an average efficiency of the the
      &               (penodg(IENOD_DCbus) + penodl(IENOD_DCbus))/0.98
       ENDIF
 
-      write(*,*)'fNetworkBalance=',fNetworkBalance,' [W?]'
+C*** DEBUG ===
+      if (DEBUG) then
+        write(*,*)'fNetworkBalance=',fNetworkBalance,' [W?]'
+      endif
+C ====
 
 C Determine operating mode, and report data to h3kreports
 
