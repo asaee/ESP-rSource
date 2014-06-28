@@ -39,15 +39,6 @@ C Input file information
       character*72 resh2flnam   !- name of file containing residential hydrogen cogen
                                 !- controller inputs
 
-C Common block storing electrical domain time-row data for additional data items.
-      common / Enet_Power_Time_Row_Data /
-     &    iPow_Time_Row_Count,
-     &    fPow_Time_Row_Present,
-     &    fPow_Time_Row_Future
-      integer iPow_Time_Row_Count ( MPOWCOM ) ! # of additional data items associated with power-only component.
-      real fPow_Time_Row_Present ( MPOWCOM, MEnet_Time_Row_MAX ) ! Component present time-row data
-      real fPow_Time_Row_Future ( MPOWCOM, MEnet_Time_Row_MAX ) ! Component future time-row data
-
 C Common block storing control and other data for plant components.
       COMMON/C9/NPCOMP,NCI(MPCOM),CDATA(MPCOM,MMISCD)
       INTEGER NPCOMP          !-number of plant components
@@ -60,7 +51,7 @@ C Common block storing additional time-row data items for plant domain.
       real pcdatp                ! component additional data (present)
 
 
-C Power-only component information
+C Power-only component information specific to RE-H2 Ctl.
       common/resh2_powoc/IPWC_PVPCU,IPWC_gridconn,IPWC_ACDC,
      &                   IPWC_battery,IPWC_PEM_DCDC,IPWC_Elec_DCDC
       integer   IPWC_PVPCU      !-index number of PCU that is connected between the PV and the DC bus

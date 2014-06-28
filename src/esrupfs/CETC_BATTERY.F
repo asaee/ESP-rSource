@@ -105,15 +105,6 @@ C      INTEGER iuin             !- read unit number
        real    qfa            !- energy injected at air node, future time-row
 
 
-C Common block storing electrical domain time-row data for additional data items.
-      common / Enet_Power_Time_Row_Data /
-     &    iPow_Time_Row_Count,
-     &    fPow_Time_Row_Present,
-     &    fPow_Time_Row_Future
-      integer iPow_Time_Row_Count ( MPOWCOM ) ! # of additional data items associated with power-only component.
-      real fPow_Time_Row_Present ( MPOWCOM, MEnet_Time_Row_MAX ) ! Component present time-row data
-      real fPow_Time_Row_Future ( MPOWCOM, MEnet_Time_Row_MAX ) ! Component future time-row data
-
 C Common block holding information on the battery's current operation.
 C This will be used by the RE-H2 controller for the time being.  A more
 C general structure of transporting data regarding the battery will be

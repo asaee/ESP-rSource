@@ -462,6 +462,20 @@ C Derived System and Nodal Values
       real ENODZBAS
       real ENODIBAS
 
+
+C Common block storing electrical domain time-row data for additional
+C (hybrid component?) data items.
+      common / Enet_Power_Time_Row_Data /
+     &    iPow_Time_Row_Count,
+     &    fPow_Time_Row_Present,
+     &    fPow_Time_Row_Future
+C.....# of additional data items associated with power-only component.
+      integer iPow_Time_Row_Count ( MPOWCOM )
+C.....Component present time-row data
+      real fPow_Time_Row_Present ( MPOWCOM, MEnet_Time_Row_MAX )
+C.....Component future time-row data
+      real fPow_Time_Row_Future ( MPOWCOM, MEnet_Time_Row_MAX )
+
 C---------------------------------------------------------------------------------
 C Common holding power generation and loads data for power-only components.
 C
