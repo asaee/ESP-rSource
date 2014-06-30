@@ -52,8 +52,12 @@ C-------------------------------------------------------------------------------
       SUBROUTINE RES_elec_storage_ctl
       IMPLICIT NONE
 
+      COMMON/OUTIN/IUOUT,IUIN
+      INTEGER IUOUT           !-write unit number
+      INTEGER IUIN            !-read unit number
+
 C Input file information
-      common/reselecctl/ireselecctl,reselecflnam
+      common/reselecctl/iResElecCtl,ResElecFlnam
       integer ireselecctl       !- flag indicating that file required by renewable energy
                                 !- system controller is specified
       character*72 reselecflnam !- name of file containing renewable energy system
@@ -63,8 +67,12 @@ C Input file information
       logical bRESElec_ctl_unconverged         !-logical flag indicating additional iterations req'd
 
 C Basic RES (elec) controller inputs
-      common/reselec/RES_elec_ctl_mode
-      integer   RES_elec_ctl_mode ! control mode 1, 2 or 3, currently only 2 is coded
+      common/reselec/RES_elec_ctl_mode, RES_elec_ctl_scenario
+      integer RES_elec_ctl_mode     ! control mode 1, 2 or 3 << Note: currently only 2 is coded >>
+      integer RES_elec_ctl_scenario ! control scenario active
+
+C Local variables
+      character*125 outstr
 
 C-----------------------------------------------------------------------------------------
 C     Check if controller is in use
@@ -166,12 +174,26 @@ C===============================================================================
       SUBROUTINE low_cost
       IMPLICIT NONE
 
+#include "building.h"
+#include "plant.h"
+#include "power.h"
 #include "BATTERY.h"
 #include "CETC_definitions.h"
 
+C Common block holding information on the battery's current operation.
+      COMMON/battery_op_data/maxPBatCharge_common,
+     &   maxPBatDischarge_common, RE_H2_control_scenario
+      REAL maxPBatCharge_common    ! Maximum charge rate of battery (W) as determined
+                                   ! for mode of operation at previous calulcation (charge or discharge).
+      REAL maxPBatDischarge_common ! Maximum discharge rate of battery (W) as determined
+                                   ! for mode of operation at previous calulcation (charge or discharge).
+      INTEGER RE_H2_control_scenario ! Param indicating which control scenario is chosen
+
+
 C Basic RES (elec) controller inputs
-      common/reselec/RES_elec_ctl_mode
-      integer   RES_elec_ctl_mode ! control mode 1, 2 or 3, currently only 2 is coded
+      common/reselec/RES_elec_ctl_mode, RES_elec_ctl_scenario
+      integer RES_elec_ctl_mode     ! control mode 1, 2 or 3 << Note: currently only 2 is coded >>
+      integer RES_elec_ctl_scenario ! control scenario active
 
 C Various RES (elec) controller inputs
       common/reselec_setpts/SOC_PV_ON,SOC_PV_OFF,
@@ -183,6 +205,18 @@ C Various RES (elec) controller inputs
       real      fPV_deadband    !-value is applied so that PV is used for battery charge
                                 !-only when the excess PV power is greater than power to meet
                                 !-the loads + power allowance for the heat pump,
+C RES (elec) node information
+      common/reselec_enode/IENOD_ACbus
+
+      integer IENOD_ACbus
+
+C Power-only component information for RES (elec) control
+      common/reselec_powoc/IPWC_PVPCU,IPWC_gridconn,IPWC_ACDC,
+     &                   IPWC_battery
+      integer   IPWC_PVPCU      !-index number of PCU that is connected between the PV and the DC bus
+      integer   IPWC_gridconn   !-index number of the grid-connection power-only component
+      integer   IPWC_ACDC       !-index number of the DC-AC converter (a PCU power-only component)
+      integer   IPWC_battery    !-index number of the battery power-only component
 
 C Controller flag information
       common/RESElec_ctl_BatStat/bPV_active,bBattery_charge,
@@ -213,15 +247,18 @@ C---- local variables ---------------------------------------------------
       real hvacl
       real occupantl
       real P_total_load       ! sum of all loads this time step, W
+cc maxPBat*_common?
       real P_capacity         ! power-capacity of battery available for this time step
       real P_available        ! power available from battery for this time step
+
       real P_residual         ! difference between PV and P_total_load
       real batDODMax          ! Maximum depth of discharge
       real fBatDemandP_old    !
 
       REAL PV_power_to_DCbus  ! PV-produced power that is added to DC bus (W).
-      REAL load_ACbus              ! Power load on AC bus (W).
-      REAL DCAC_eff                ! Efficiency of DC-AC converter.
+      REAL load_ACbus         ! Power load on AC bus (W).
+      REAL DCAC_eff           ! Efficiency of DC-AC converter.
+      REAL power_DC_to_AC_required ! Power required to DC-AC converter to meet load on AC bus (W).
       REAL SOC_battery        ! battery state of charge.
 
 CCC   ... these two need to be replaced by appropriate variables from
@@ -230,14 +267,13 @@ CCC       the electrical net ...
       real import_from_grid
 
 
-      logical bBatteryFull    ! flag .true. if battery fully charged
+      logical bBatteryFull    ! flag .true. if battery fully charged;
       logical bBatteryCharged ! flag .true. if battery has available capacity for discharge
 
       logical bGridRefundHigh ! flag .true. if exporting to grid has 'high rate'
       logical bGridRateLow    ! flag .true. if importing from grid is 'cheap'
 
       logical DEBUG
-      DEBUG = .true.          ! toggle debug mode
 
 C---- function definitions ----------------------------------------------
 
@@ -245,12 +281,17 @@ C---- function definitions ----------------------------------------------
                                 ! from electrical network depending on the
                                 ! integer parameter passed to it.
 
+C ---
+      DEBUG = .true.          ! toggle debug mode
+
+
 C---- Initiate variables according to battery type ----------------------
-      IF( POWCOMID(IPWC) .EQ. pba) THEN      ! Lead-acid battery
+
+      IF(POWCOMID(IPWC_battery) .EQ. pba) THEN     ! Lead-acid battery
         batDODMax = POWCDAT(IPWC_battery,48)
-      ELSEIF(POWCOMID(IPWC) .EQ. vrb) THEN   ! VRB
+      ELSEIF(POWCOMID(IPWC_battery) .EQ. vrb) THEN  ! VRB
 cx        batDODMax = ??
-      ELSEIF(POWCOMID(IPWC) .EQ. lion) THEN !Lithium-ion battery
+      ELSEIF(POWCOMID(IPWC_battery) .EQ. lion) THEN ! Lithium-ion battery
         batDODMax = POWCDAT(IPWC_battery,14)
       ENDIF
 
@@ -348,7 +389,7 @@ C---- Overall building loads this time step (W) --------------
 C*** DEBUG ===
       if (DEBUG) then
         write(*,*)'hvacl=',hvacl,', occupantl=',occupantl,
-     &     ', PVgen=',PVgen
+     &     ', PVgen=',PV_power_to_DCbus
       endif
 C ====
 
@@ -397,7 +438,7 @@ C               available to grid
         else
 C       PV can not cover full load
 
-          P_residual = P_total_load - PVgen ! (W)
+          P_residual = P_total_load - PV_power_to_DCbus ! (W)
 
 C         Does battery have available capacity for discharge?
           if (bBatteryCharged) then
@@ -524,8 +565,9 @@ C Input file information
                                 !- controller inputs
 
 C Basic RES (elec) controller inputs
-      common/reselec/RES_elec_ctl_mode
-      integer   RES_elec_ctl_mode ! control mode 1, 2 or 3, currently only 2 is coded
+      common/reselec/RES_elec_ctl_mode, RES_elec_ctl_scenario
+      integer RES_elec_ctl_mode     ! control mode 1, 2 or 3 << Note: currently only 2 is coded >>
+      integer RES_elec_ctl_scenario ! control scenario active
 
 C Power-only component information for RES (elec) control
       common/reselec_powoc/IPWC_PVPCU,IPWC_gridconn,IPWC_ACDC,
@@ -606,16 +648,15 @@ C # Inputs required by controller in the following order:
 C 2            # (0)  control mode (1, 2 or 3) << only '2' usable >>
 C 3            # (1)  node number of the AC bus
 C 3            # (2)  node number of the DC bus
-C 3            # (3)  index number of PCU that is connected between the PV and the DC bus
-C 5            # (4)  index number of the grid-connection power-only component
+C 2            # (3)  index number of the battery power-only component
+C 3            # (4)  index number of PCU that is connected between the PV and the DC bus
 C 6            # (5)  index number of the DC-AC converter (a PCU power-only component)
-C 2            # (6)  index number of the battery power-only component
-C 1            # (7)  index number of the heat pump plant component
-C 125          # (8)  battery SOC at which PV is used
-C 100          # (9)  battery SOC at which PV use is ended
-C -20          # (10) battery SOC at which grid is used
-C 20           # (11) battery SOC at which grid use is ended
-C 400.         # (12) controller deadband for PV battery charge (W)
+C 5            # (6)  index number of the grid-connection power-only component
+C 25           # (7)  battery SOC at which PV is used for charging
+C 100          # (8)  battery SOC at which PV use for charging is ended
+C 25           # (9)  battery SOC at which grid is used for charging
+C 100          # (10) battery SOC at which grid use for charging is ended
+C 400.         # (11) controller deadband for PV battery charge (W)
 C-----------------------------------------------------------------------------------------
 
 C Notify user that renewable energy system (elec) control file is being processed
@@ -686,6 +727,20 @@ C     Read the node number of the DC bus.
       endif
 
 C     (3)
+C     Read the index number of the battery power-only component.
+      call stripc(ireselecfl_ascii,outstr,0,nd,1,'battery',ier)
+      if ( ier .ne. 0 ) then
+         write(iuout,*) 'File read error reading battery index number.'
+         bFileError = .true.
+      endif
+      k = 0
+      call egetwi(outstr,k,IPWC_battery,1,MPOWCOM,'W','battery',ier)
+      if ( ier .ne. 0 ) then
+         write(iuout,*) 'Error reading battery index number. '
+         bFileError = .true.
+      endif
+
+C     (4)
 C     Read the index number of the PCU that is connected between the PV and the DC bus.
       call stripc(ireselecfl_ascii,outstr,0,nd,1,'pvpcu',ier)
       if ( ier .ne. 0 ) then
@@ -696,20 +751,6 @@ C     Read the index number of the PCU that is connected between the PV and the 
       call egetwi(outstr,k,IPWC_PVPCU,1,MPOWCOM,'W','pvpcu',ier)
       if ( ier .ne. 0 ) then
          write(iuout,*) 'Error reading PV PCU index number. '
-         bFileError = .true.
-      endif
-
-C     (4)
-C     Read the index number of the grid-connection power-only component.
-      call stripc(ireselecfl_ascii,outstr,0,nd,1,'grid conn',ier)
-      if ( ier .ne. 0 ) then
-         write(iuout,*)'File read error reading grid conn index number.'
-         bFileError = .true.
-      endif
-      k = 0
-      call egetwi(outstr,k,IPWC_gridconn,1,MPOWCOM,'W','grid conn',ier)
-      if ( ier .ne. 0 ) then
-         write(iuout,*) 'Error reading grid conn index number. '
          bFileError = .true.
       endif
 
@@ -729,37 +770,20 @@ C     Read the index number of the DC-AC converter.
       endif
 
 C     (6)
-C     Read the index number of the battery power-only component.
-      call stripc(ireselecfl_ascii,outstr,0,nd,1,'battery',ier)
+C     Read the index number of the grid-connection power-only component.
+      call stripc(ireselecfl_ascii,outstr,0,nd,1,'grid conn',ier)
       if ( ier .ne. 0 ) then
-         write(iuout,*) 'File read error reading battery index number.'
+         write(iuout,*)'File read error reading grid conn index number.'
          bFileError = .true.
       endif
       k = 0
-      call egetwi(outstr,k,IPWC_battery,1,MPOWCOM,'W','battery',ier)
+      call egetwi(outstr,k,IPWC_gridconn,1,MPOWCOM,'W','grid conn',ier)
       if ( ier .ne. 0 ) then
-         write(iuout,*) 'Error reading battery index number. '
+         write(iuout,*) 'Error reading grid conn index number. '
          bFileError = .true.
       endif
 
 C     (7)
-C     Read the index number of the heat pump plant component.
-      call stripc(ireselecfl_ascii,outstr,0,nd,1,
-     &                          'file heat pump ipcomp',ier)
-      if ( ier .ne. 0 ) then
-         write(iuout,*) 'File read error reading heat pump plant',
-     &        ' comp index.'
-         bFileError = .true.
-      endif
-      k = 0
-      call egetwi(outstr,k,IPCOMP_heat_pump,1,MPCOM,
-     &            'W','heat pump ipcomp',ier)
-      if ( ier .ne. 0 ) then
-         write(iuout,*) 'Error reading heat pump plant comp index.'
-         bFileError = .true.
-      endif
-
-C     (8)
 C     Read the battery SOC at which the PV is used.
       call stripc(ireselecfl_ascii,outstr,0,nd,1,'SOC PV on',ier)
       if ( ier .ne. 0 ) then
@@ -774,7 +798,7 @@ C     Read the battery SOC at which the PV is used.
          bFileError = .true.
       endif
 
-C     (9)
+C     (8)
 C     Read the battery SOC at which PV use is ended.
       call stripc(ireselecfl_ascii,outstr,0,nd,1,'SOC PV off',ier)
       if ( ier .ne. 0 ) then
@@ -789,7 +813,7 @@ C     Read the battery SOC at which PV use is ended.
          bFileError = .true.
       endif
 
-C     (10)
+C     (9)
 C     Read the battery SOC at which the grid is used.
       call stripc(ireselecfl_ascii,outstr,0,nd,1,'File SOC grid on',ier)
       if ( ier .ne. 0 ) then
@@ -804,7 +828,7 @@ C     Read the battery SOC at which the grid is used.
          bFileError = .true.
       endif
 
-C     (11)
+C     (10)
 C     Read the battery SOC at which the grid use ends.
       call stripc(ireselecfl_ascii,outstr,0,nd,1,
      &                                         'File SOC grid off',ier)
@@ -821,7 +845,7 @@ C     Read the battery SOC at which the grid use ends.
          write(cErrLoc,'(A)')'SOC grid off'
       endif
 
-C     (12)
+C     (11)
 C     Read the controller deadband for PV battery loading
       call stripc(ireselecfl_ascii,outstr,0,nd,1,
      &                                  'file power deadband',ier)
@@ -890,6 +914,11 @@ C Input file information
       character*72 reselecflnam !- name of file containing renewable energy system
                                 !- controller inputs
 
+C Basic RES (elec) controller inputs
+      common/reselec/RES_elec_ctl_mode, RES_elec_ctl_scenario
+      integer RES_elec_ctl_mode     ! control mode 1, 2 or 3 << Note: currently only 2 is coded >>
+      integer RES_elec_ctl_scenario ! control scenario active
+
 C Electric node information
       common/reselec_enode/IENOD_ACbus,IENOD_DCbus
       INTEGER IENOD_ACbus    ! Elec domain node number of AC bus.
@@ -956,6 +985,10 @@ cx     &         fNetworkBalance)
 C.......Battery is responding to loads
 cx        Call AddToReport(rvCtrlReH2NPwPEMFCAct%Identifier,0.0)
       endif
+
+cx      Call AddToReport(rvElecNetCtrlScn%Identifier,
+cx     &      REAL(RES_elec_ctl_scenario),
+cx     &      powcomnam(IPWC)(1:iNameLength))
 
       return
       end
