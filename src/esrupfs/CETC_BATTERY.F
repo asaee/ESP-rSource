@@ -298,12 +298,12 @@ C       This should not be possible !!
 
       ENDIF ! (mandChargeCycle .NE. 1)
 
-C-------Assign maxPBatCharge and maxPBat Discharge to a common block variable
-C-------so that the maximum charge rate and maximum discharge rate
-C-------of the battery can be transposed outside this subroutine.  This is an inelegant
-C-------solution that should be replaced with a more generalized approach in the future.
-        maxPBatCharge_common = maxPBatCharge
-        maxPBatDischarge_common = maxPBatDischarge
+C-----Assign maxPBatCharge and maxPBat Discharge to a common block variable
+C-----so that the maximum charge rate and maximum discharge rate
+C-----of the battery can be transposed outside this subroutine.  This is an inelegant
+C-----solution that should be replaced with a more generalized approach in the future.
+      maxPBatCharge_common = maxPBatCharge
+      maxPBatDischarge_common = maxPBatDischarge
 
       IF(batMode .EQ. 1 .OR. batMode .EQ. 2 ) THEN  ! Discharge or idle
          maxCBat = maxCBatDischarge
@@ -384,6 +384,7 @@ C Save variables that are required by control sensors.
       iPow_Time_Row_Count(IPWC) = 2                         ! # of additional data
       fPow_Time_Row_Future(IPWC,1) = (1. - batDODFin)*100.  ! battery SOC, %
       fPow_Time_Row_Future(IPWC,2) = batTFin                ! battery temperature
+cx      fPow_Time_Row_Future(IPWC,3) = maxPBatDischarge       ! max discharge rate (alternative to _common)
 
 C power returned/taken to meet the demand
       IF ( batMode .EQ. 1 .OR. batMode .EQ. 2 ) THEN  ! discharge

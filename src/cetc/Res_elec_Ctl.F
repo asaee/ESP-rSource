@@ -247,9 +247,7 @@ C---- local variables ---------------------------------------------------
       real hvacl
       real occupantl
       real P_total_load       ! sum of all loads this time step, W
-cc maxPBat*_common?
-      real P_capacity         ! power-capacity of battery available for this time step
-      real P_available        ! power available from battery for this time step
+      real P_available        ! power available this time step (PV - load)
 
       real P_residual         ! difference between PV and P_total_load
       real batDODMax          ! Maximum depth of discharge
@@ -259,7 +257,6 @@ cc maxPBat*_common?
       REAL load_ACbus         ! Power load on AC bus (W).
       REAL DCAC_eff           ! Efficiency of DC-AC converter.
       REAL power_DC_to_AC_required ! Power required to DC-AC converter to meet load on AC bus (W).
-      REAL SOC_battery        ! battery state of charge.
 
 CCC   ... these two need to be replaced by appropriate variables from
 CCC       the electrical net ...
@@ -268,7 +265,7 @@ CCC       the electrical net ...
 
 
       logical bBatteryFull    ! flag .true. if battery fully charged;
-      logical bBatteryCharged ! flag .true. if battery has available capacity for discharge
+      logical bBatteryEmpty   ! flag .false. if battery has available capacity for discharge
 
       logical bGridRefundHigh ! flag .true. if exporting to grid has 'high rate'
       logical bGridRateLow    ! flag .true. if importing from grid is 'cheap'
@@ -295,21 +292,18 @@ cx        batDODMax = ??
         batDODMax = POWCDAT(IPWC_battery,14)
       ENDIF
 
-C     Depth of discharge '0' with tolerance 0.001 is viewed as "full"
-      call eclose(batDODFin,0.,0.001, bBatteryFull)
+C     Depth of discharge '0' with tolerance 0.005 (0.5%) is viewed as "full"
+      call eclose(batDODFin,0.,0.005, bBatteryFull)
 
-C     Depth of discharge for which battery is considered "empty"
-      if (batDODFin .gt. batDODMax) then
-        bBatteryCharged = .false.
-      else
-        bBatteryCharged = .true.
-      endif
+C     Check against depth of discharge 'batDODMax', for which battery is
+C     considered "empty"
+      call eclose(batDODFin,batDODMax,0.01,bBatteryEmpty)
 
 C----------------------------------------------------------------------------------------
 C     Save battery data from last call
 C----------------------------------------------------------------------------------------
 
-      fBatDemandP_old = batDemandP
+      fBatDemandP_old = batDemandP ! << not used, what is it for?? >>
 
 C-----------------------------------------------------------------------------------------
 C Sense power generation from PCU that is connected between PV and DC bus.  This
@@ -356,52 +350,15 @@ C-------------------------------------------------------------------------------
 
       power_DC_to_AC_required = load_ACbus / DCAC_eff
 
-C-----------------------------------------------------------------------------------------
-C Determine the battery's SOC at the previous iteration and establish the
-C following:
-C  1) If there is excess PV-produced power on the DC bus whether this
-C     power will be directed to the battery or to the grid.
-C  2) If there is a deficit of PV-produced power on the DC bus whether
-C     the battery or the grid will supply the deficit.
-C-----------------------------------------------------------------------------------------
-
-      SOC_battery = fPow_Time_Row_Future(IPWC_battery,1)
-
-
-C*** DEBUG ===
-      if (DEBUG) then
-        write(*,*)'bBatteryFull=',bBatteryFull,', bBatteryCharged=',
-     &     bBatteryCharged,', batDODFin=',batDODFin
-      endif
-C =====
-
+C-----
       bGridRateLow    = .false.  ! these should be based on values in
-      bGridRefundHigh = .true.   ! input file with grid rates ...
-
-      P_capacity = 10. ! << get from battery, somehow ... >>
+      bGridRefundHigh = .false.   ! input file with grid rates ...      
 
 C---- Overall building loads this time step (W) --------------
       hvacl = elec_net_load_calc(hvac_load)
       occupantl = elec_net_load_calc(occupant_load)
 
       P_total_load = hvacl + occupantl
-
-C*** DEBUG ===
-      if (DEBUG) then
-        write(*,*)'hvacl=',hvacl,', occupantl=',occupantl,
-     &     ', PVgen=',PV_power_to_DCbus
-      endif
-C ====
-
-C     Demand in Watts imposed on the battery
-C     +ve indicates discharging the battery, -ve charge
-C     <<for a pba, for lion, it seems batDemand must change sign (?)>>
-cx      batDemandP = -825.-house_load
-cx      if (generation .gt. (hvacl+occupantl)) then
-cx        batDemandP = 0.
-cx      else
-cx        batDemandP = -1*(hvacl+occupantl-generation)
-cx      endif
 
 C--- Begin control logic
 
@@ -411,26 +368,34 @@ C     PV generation available (W)
 
           P_available = PV_power_to_DCbus - P_total_load ! (W)
 
+          batDemandP = 0.0
+
 C         Is battery fully charged or can it take some additional charging?
           if (bBatteryFull) then
+            RES_elec_ctl_scenario = 1
             export_to_grid = P_available
 
           else
             if (bGridRefundHigh) then
+              RES_elec_ctl_scenario = 2
 C             Refund rate for export to grid is high
               export_to_grid = P_available
 
             else
 C             Refund for export to grid is low
-              if (P_available .le. P_capacity) then
+
+              if (P_available .le. maxPBatCharge_common) then
+                RES_elec_ctl_scenario = 3
 C               Charge battery with all available power
-                batDemandP = P_available
+                batDemandP = -1.0*P_available
 
               else
-C               Charge battery until full, then export excess energy 
-C               available to grid
-                batDemandP = P_capacity
-                export_to_grid = P_available - P_capacity
+                RES_elec_ctl_scenario = 4
+C               Charge battery until full, then export excess energy
+C               available to grid (-ve is charge)
+                batDemandP = -1.0*maxPBatCharge_common
+                export_to_grid = P_available - maxPBatCharge_common
+
               endif ! available .le. capacity
             endif ! grid_refund_high
           endif ! battery_full
@@ -441,61 +406,85 @@ C       PV can not cover full load
           P_residual = P_total_load - PV_power_to_DCbus ! (W)
 
 C         Does battery have available capacity for discharge?
-          if (bBatteryCharged) then
+          if ( .not. bBatteryEmpty) then
 C           Is electricity from grid cheap?
             if (bGridRateLow) then
+              RES_elec_ctl_scenario = 5
 C             Grid electricity is cheap, import everything not covered by PV
 C             from grid
               import_from_grid = P_residual ! (W)
 
             else
-              if (P_residual .le. P_capacity) then
+C             Electricity from grid is expensive!
+              if (P_residual .le. maxPBatDischarge_common) then
+                RES_elec_ctl_scenario = 6
 C               Available battery capacity can cover load in this time step
 C               grid electricity is expensive, so use battery to cover 
 C               residual load
                 batDemandP = P_residual
               else
-
+                RES_elec_ctl_scenario = 7
 C               Grid electricity is expensive, use battery as far as it goes,
 C               then import remaining energy required from grid
-                import_from_grid = P_residual - P_capacity
+                batDemandP = maxPBatDischarge_common
+                import_from_grid = P_residual - maxPBatDischarge_common
               endif ! residual .le. capacity
             endif ! grid_rate_low
 
           else
+            RES_elec_ctl_scenario = 8
 C           Battery is empty, import residual load from grid
             import_from_grid = P_residual
-          endif ! battery_charged
+          endif ! .not.BatteryEmpty
         endif ! PV .ge. E_ges
 
       else
 C     No PV output available (night time)
 
-        if (bBatteryCharged) then
+        if ( .not. bBatteryEmpty) then
 C         Is import of electricity from grid cheap?
           if (bGridRateLow) then
+            RES_elec_ctl_scenario = 9
 C           Grid electricity is cheap, so use grid
             import_from_grid = P_total_load
 
           else
-            if (P_total_load .le. P_capacity) then
+
+            if (P_total_load .le. maxPBatDischarge_common) then
+              RES_elec_ctl_scenario = 10
 C             Grid electricity is expensive, so use battery
               batDemandP = P_total_load
 
             else
+              RES_elec_ctl_scenario = 11
 C             Grid electricity is expensive, so discharge battery until empty,
 C             then import remaining energy required from grid
-              batDemandP = P_capacity
-              import_from_grid = P_total_load - P_capacity
+              batDemandP = maxPBatDischarge_common
+cx              import_from_grid = P_total_load - maxPBatDischarge_common
+
             endif ! E_ges .lt. capacity
           endif ! grid_rate_low
 
         else 
-C       Battery is empty, import from grid
-
+          RES_elec_ctl_scenario = 12
+C         Battery is empty, import from grid
+          batDemandP = 0.0
           import_from_grid = P_total_load
-        endif ! battery_charged
+
+        endif ! .not.BatteryEmpty
       endif ! PV .gt. 0
+
+C*** DEBUG ===
+      if (DEBUG) then
+        write(*,*)'hvacl=',hvacl,
+     &     ', occuptl=',occupantl,
+     &     ', PVgen=',PV_power_to_DCbus,
+     &     ', BatFull ?',bBatteryFull,
+     &     ', BatEmpty?',bBatteryEmpty,
+     &     ', batDODFin=',batDODFin,
+     &     ', batDemandP=',batDemandP
+      endif
+C ====
 
 
 C--- End control logic
