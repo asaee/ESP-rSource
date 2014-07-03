@@ -948,6 +948,12 @@ C*** DEBUG ===
       endif
 C ====
 
+C@@@@@
+C     Control scenario this TS
+      Call AddToReport(rvRESElecCtlScenario%Identifier,
+     &         real(RES_elec_ctl_scenario))
+C@@@@@
+
 C Determine operating mode, and report data to h3kreports
 
       if (  bBattery_charge ) then
