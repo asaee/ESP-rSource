@@ -1,9 +1,24 @@
+C This file is part of the ESP-r system.
+C
+C ESP-r is free software.  You can redistribute it and/or
+C modify it under the terms of the GNU General Public
+C License as published by the Free Software Foundation
+C (version 2 or later).
+
+C ESP-r is distributed in the hope that it will be useful
+C but WITHOUT ANY WARRANTY; without even the implied
+C warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+C PURPOSE. See the GNU General Public License for more
+C details.
+
+C You should have received a copy of the GNU General Public
+C License along with ESP-r. If not, write to the Free
+C Software Foundation, Inc., 59 Temple Place, Suite 330,
+C Boston, MA 02111-1307 USA.
+
 C-----------------------------------------------------------------------------------------
 C This is a customized controller for purposes of modelling electrical nets featuring
-C a battery and (typically) PV in models also using explicit plants for HVAC.
-C Unlike conventional ESP-r controllers this controller can sense the state of
-C numerous plant and electrical domain components and can actuate numerous plant and
-C electrical domain components.
+C a battery and (typically) PV in models optionally also using explicit plants for HVAC.
 C
 C The structure of this controller is customized to quite specific system configurations.
 C
@@ -19,8 +34,8 @@ C
 C Since the plant domain is solved prior to the invocation of the electric domain,
 C the controller is sensing the state of plant components at the current time-step.
 C
-C The controller actuates a number of plant domain components.  If one of these control
-C actions results in a different operational mode for a plant component, a flag is set
+C If the controller actuates a plant domain component and such a control
+C action results in a different operational mode for a plant component, a flag is set
 C that forces another iteration through the plant and electric domains at the current
 C time-step.
 C
@@ -47,6 +62,18 @@ C
 C  RES_elec_ctl_read       Reads information required by RES_elec_storage_ctl
 C
 C  RES_elec_ctl_PostProcess() Writes output to h3k (currently not activated)
+C-----------------------------------------------------------------------------------------
+C Also contains the following subroutines for reading specific external data files:
+C
+C  CreateBinaryDataFile    Checks .fcl file and creates binary file with time series
+C                          of data.
+C  ReadBinaryDataFile      Retrieves the value for the current time-step.
+C
+C References:
+C   esrupfs/powoc.F
+C   cetc/FC_components.F and
+C
+C   are the basis for the subroutines defined herein
 C
 C-----------------------------------------------------------------------------------------
       SUBROUTINE RES_elec_storage_ctl
@@ -190,6 +217,9 @@ C Common block holding information on the battery's current operation.
       INTEGER RE_H2_control_scenario ! Param indicating which control scenario is chosen
 
 
+      common / reselec_ctl_status / bRESElec_ctl_unconverged
+      logical bRESElec_ctl_unconverged  !-logical flag indicating additional iterations req'd
+
 C Basic RES (elec) controller inputs
       common/reselec/RES_elec_ctl_mode, RES_elec_ctl_scenario
       integer RES_elec_ctl_mode     ! control mode 1, 2 or 3 << Note: currently only 2 is coded >>
@@ -198,13 +228,25 @@ C Basic RES (elec) controller inputs
 C Various RES (elec) controller inputs
       common/reselec_setpts/SOC_PV_ON,SOC_PV_OFF,
      &   SOC_grid_ON,SOC_grid_OFF,fPV_deadband
-      real      SOC_PV_ON       !-battery SOC at which PV is used
-      real      SOC_PV_OFF      !-battery SOC at which PV use is ended
-      real      SOC_grid_ON     !-battery SOC at which grid is used
-      real      SOC_grid_OFF    !-battery SOC at which grid use is ended
-      real      fPV_deadband    !-value is applied so that PV is used for battery charge
-                                !-only when the excess PV power is greater than power to meet
-                                !-the loads + power allowance for the heat pump,
+      real      SOC_PV_ON           !-battery SOC at which PV is used
+      real      SOC_PV_OFF          !-battery SOC at which PV use is ended
+      real      SOC_grid_ON         !-battery SOC at which grid is used
+      real      SOC_grid_OFF        !-battery SOC at which grid use is ended
+      real      fPV_deadband        !-value is applied so that PV is used for battery charge
+                                    !-only when the excess PV power is greater than power to meet
+                                    !-the loads + power allowance for the heat pump
+
+C Common for grid rate and grid refund data management
+      common/GridFinancial/iGridRateToggle,iGridRefundToggle,
+     &   GridRateThreshold,GridRefundThreshold,
+     &   iFIL_GridRate,iFIL_GridRefund
+      integer   iGridRateToggle     !
+      integer   iGridRefundToggle   !
+      real      GridRateThreshold   !
+      real      GridRefundThreshold !
+      integer   iFIL_GridRate       !
+      integer   iFIL_GridRefund     !
+
 C RES (elec) node information
       common/reselec_enode/IENOD_ACbus
 
@@ -223,25 +265,11 @@ C Controller flag information
      &                    bBattery_discharge
       logical bPV_active,bBattery_charge,bBattery_discharge
 
+C@@@@@@@@
+C=== RESIDUAL from original controller ... probably obsolete:
 C House non hvac load determined in subroutine POWOC_nonHVACld
       common/Res_elec_ctl/house_load
       real     house_load ! The house load in (W)
-
-C ESP-r COMMONs
-c       COMMON/SIMTIM/IHRP,IHRF,IDYP,IDYF,IDWP,IDWF,NSINC,ITS
-c       INTEGER IHRP            !-hour of present time-step
-c       INTEGER IHRF            !-hour of future time-step
-c       INTEGER IDYP            !-year day number of present day
-c       INTEGER IDYF            !-year day number of future day
-c       INTEGER IDWP            !-day of the week of present day
-c       INTEGER IDWF            !-day of the week of future day
-c       INTEGER NSINC           !-number of building-side time increments
-                               !-since start of simulation
-c       INTEGER ITS             !-current building time-step within
-                               !-current hour
-
-c       COMMON/PCTIME/TIMSEC
-c       REAL    TIMSEC          !-length of time increment (second)
 
 C---- local variables ---------------------------------------------------
       real hvacl
@@ -252,6 +280,8 @@ C---- local variables ---------------------------------------------------
       real P_residual         ! difference between PV and P_total_load
       real batDODMax          ! Maximum depth of discharge
       real fBatDemandP_old    !
+      real fGridRate
+      real fGridRefund
 
       REAL PV_power_to_DCbus  ! PV-produced power that is added to DC bus (W).
       REAL load_ACbus         ! Power load on AC bus (W).
@@ -263,12 +293,15 @@ CCC       the electrical net ...
       real export_to_grid
       real import_from_grid
 
+      integer iComponentType,iHyb,iIndex,iLoadIndex
 
       logical bBatteryFull    ! flag .true. if battery fully charged;
       logical bBatteryEmpty   ! flag .false. if battery has available capacity for discharge
 
       logical bGridRefundHigh ! flag .true. if exporting to grid has 'high rate'
       logical bGridRateLow    ! flag .true. if importing from grid is 'cheap'
+
+      logical bBat_same_signal
 
       logical DEBUG
 
@@ -280,7 +313,6 @@ C---- function definitions ----------------------------------------------
 
 C ---
       DEBUG = .true.          ! toggle debug mode
-
 
 C---- Initiate variables according to battery type ----------------------
 
@@ -303,7 +335,7 @@ C-------------------------------------------------------------------------------
 C     Save battery data from last call
 C----------------------------------------------------------------------------------------
 
-      fBatDemandP_old = batDemandP ! << not used, what is it for?? >>
+      fBatDemandP_old = batDemandP
 
 C-----------------------------------------------------------------------------------------
 C Sense power generation from PCU that is connected between PV and DC bus.  This
@@ -316,6 +348,7 @@ C-------------------------------------------------------------------------------
 cx    << how to consider 3phase PV setup?? >>
       PV_power_to_DCbus = fPow_Time_Row_Future(IPWC_PVPCU,1)
 
+C@@@@@@@ EXTRACT FROM H2_CTL /=/ Useful? Necessary? Correct?
 
 C-----------------------------------------------------------------------------------------
 C Sense the loading on the AC bus from the previous iteration.
@@ -325,8 +358,9 @@ C IPWC_gridconn is the index number of the grid-connection powoc.
 C
 C Note: the function Elec_Net_Load_Calc cannot be used to evaluate the load
 C on the AC bus because this function sums the loads and generation
-C for all powoc and hybrid components on the entire electrical network.  In this case
-C I want to evaluate only the loading on a single node. << ? is that the case, here >>
+C for all powoc and hybrid components on the entire electrical network.
+C
+C << is this a) correct (IMO, it depends on the call) and b) relevant here? >>
 C-----------------------------------------------------------------------------------------
 
       load_ACbus = ABS(PENODL(IENOD_ACbus))
@@ -350,13 +384,69 @@ C-------------------------------------------------------------------------------
 
       power_DC_to_AC_required = load_ACbus / DCAC_eff
 
-C-----
-      bGridRateLow    = .false.  ! these should be based on values in
-      bGridRefundHigh = .false.   ! input file with grid rates ...      
+C@@@@@@@ END EXTRACT
 
-C---- Overall building loads this time step (W) --------------
-      hvacl = elec_net_load_calc(hvac_load)
-      occupantl = elec_net_load_calc(occupant_load)
+C-----
+C     Retrieve current values for grid rate
+      if (iGridRateToggle .eq. 0) then
+        bGridRateLow = .false.
+      elseif (iGridRateToggle .eq. 1) then
+        bGridRateLow = .true.
+      else ! if ( eq. 2) ... << explicit case for error catching? >>
+C       Read current value from file
+        call ReadBinaryDataFile(iFIL_GridRate,fGridRate)
+        if (fGridRate .gt. GridRateThreshold) then
+          bGridRateLow = .false.
+        else
+          bGridRateLow = .true.
+        endif
+      endif
+
+C     Retrieve current values for grid rate
+      if (iGridRateToggle .eq. 0) then
+        bGridRefundHigh = .false.    
+      elseif (iGridRateToggle .eq. 1) then
+        bGridRefundHigh = .true.
+      else
+C       Read current value from file
+        call ReadBinaryDataFile(iFIL_GridRefund,fGridRefund)
+        if (fGridRefund .lt. GridRefundThreshold) then
+          bGridRefundHigh = .false.
+        else
+          bGridRefundHigh = .true.
+        endif
+      endif
+
+
+C---- Overall building electrical loads this time step (W) --------------
+C     Logic from elec_net_load_calc (duplicated here because for some
+C     reason occupant load results were always zero!)
+      hvacl = 0.
+      occupantl = 0.
+
+      DO iHyb=1,nHYBcom
+C........Determine the type of component.
+         iComponentType = HYCOMTYP(iHyb)
+C........Get required component index values.
+         iIndex = HYLOC(iHyb,1)
+         iLoadIndex = HYLOC(iHyb,2)
+
+         IF ( iComponentType .eq. 1 ) THEN
+C........Zone casual gains (ESRU coupling)
+           occupantl = occupantl + PEZON( iIndex, iLoadIndex ) ! (W)
+         ELSEIF ( iComponentType .eq. 3 ) THEN
+C..............Plant component.
+           if (PPCMP(iIndex) .lt.0) then
+               hvacl = hvacl + PPCMP( iIndex )
+           endif
+         endif
+      end do
+
+      hvacl = abs(hvacl)
+      occupantl = abs(occupantl) ! here, load is .gt. zero
+
+cx      hvacl = elec_net_load_calc(hvac_load)
+cx      occupantl = elec_net_load_calc(occupant_load)
 
       P_total_load = hvacl + occupantl
 
@@ -479,16 +569,31 @@ C*** DEBUG ===
         write(*,*)'hvacl=',hvacl,
      &     ', occuptl=',occupantl,
      &     ', PVgen=',PV_power_to_DCbus,
-     &     ', BatFull ?',bBatteryFull,
-     &     ', BatEmpty?',bBatteryEmpty,
+c     &     ', BatFull ?',bBatteryFull,
+c     &     ', BatEmpty?',bBatteryEmpty,
      &     ', batDODFin=',batDODFin,
+     &     ', Ctl-scen=',RES_elec_ctl_scenario,
      &     ', batDemandP=',batDemandP
       endif
 C ====
 
-
 C--- End control logic
 
+C Check if plant domain controls have been adjusted. As battery can
+C cover full load and plant loads (e.g. heat pump) tend to be dominating
+C loads, this seems a plausible precaution
+      call eclose ( fBatDemandP_old,
+     &                batDemandP,
+     &                2.0,                            ! 2W tolerance
+     &                bBat_same_signal )
+
+      if ( bBat_same_signal ) then
+C       Plt controls have not changed, and additional interdomain iteration is unnecessary
+        bRESElec_ctl_unconverged = .false.
+      else
+C       Plt controls have changed, and additional iteration is required.
+        bRESElec_ctl_unconverged = .true.
+      endif
 
       END ! low cost control mode
 
@@ -535,6 +640,7 @@ C===============================================================================
 #include "building.h"
 #include "plant.h"
 #include "power.h"
+#include "BinaryDataFile.h"
 
 C-----------------------------------------------------------------------------------------
 C COMMON declarations
@@ -577,16 +683,25 @@ C Electric node information for RES (elec) control
 
 C Various RES (elec) controller inputs
       common/reselec_setpts/SOC_PV_ON,SOC_PV_OFF,
-     &                 SOC_grid_ON,SOC_grid_OFF,
-     &   fPV_deadband
-      real      SOC_PV_ON       !-battery SOC at which PV is used
-      real      SOC_PV_OFF      !-battery SOC at which PV use is ended
-      real      SOC_grid_ON     !-battery SOC at which grid is used
-      real      SOC_grid_OFF    !-battery SOC at which grid use is ended
-      real      fPV_deadband    !-value is applied so that PV is used for battery charge
-                                !-only when the excess PV power is greater than power to meet
-                                !-the loads + power allowance for the heat pump,
+     &   SOC_grid_ON,SOC_grid_OFF,fPV_deadband
+      real      SOC_PV_ON           !-battery SOC at which PV is used
+      real      SOC_PV_OFF          !-battery SOC at which PV use is ended
+      real      SOC_grid_ON         !-battery SOC at which grid is used
+      real      SOC_grid_OFF        !-battery SOC at which grid use is ended
+      real      fPV_deadband        !-value is applied so that PV is used for battery charge
+                                    !-only when the excess PV power is greater than power to meet
+                                    !-the loads + power allowance for the heat pump
 
+C Commons for grid rate and grid refund data management
+      common/GridFinancial/iGridRateToggle,iGridRefundToggle,
+     &   GridRateThreshold,GridRefundThreshold,
+     &   iFIL_GridRate,iFIL_GridRefund
+      integer   iGridRateToggle     !
+      integer   iGridRefundToggle   !
+      real      GridRateThreshold   !
+      real      GridRefundThreshold !
+      integer   iFIL_GridRate       !
+      integer   iFIL_GridRefund     !
 
 C-----------------------------------------------------------------------------------------
 C Type declarations for local variables.
@@ -646,6 +761,10 @@ C 100          # (8)  battery SOC at which PV use for charging is ended
 C 25           # (9)  battery SOC at which grid is used for charging
 C 100          # (10) battery SOC at which grid use for charging is ended
 C 400.         # (11) controller deadband for PV battery charge (W)
+C 0            # (12) grid rate toggle
+C ./gridrate.fcl # (12a) if (12) is set to "2"
+C 0            # (13) grid refund toggle
+C ./gridrefund.fcl #(13a) if (13) is set to "2"
 C-----------------------------------------------------------------------------------------
 
 C Notify user that renewable energy system (elec) control file is being processed
@@ -681,10 +800,17 @@ C     Read the control mode.
          write(cErrLoc,'(A)')'control mode'
       endif
 
-C     Control mode dependant inputs ...
+C     Read control mode dependant inputs ...
+
+      !-------------------------------!
+      ! Mode 1                        !
+      !-------------------------------!
       if (RES_elec_ctl_mode .eq. 1) then
 C     << to be defined >>
 
+      !-------------------------------!
+      ! Mode 2                        !
+      !-------------------------------!
       elseif (RES_elec_ctl_mode .eq. 2) then
 
 C     (1)
@@ -851,6 +977,119 @@ C     Read the controller deadband for PV battery loading
         write(cErrLoc,'(A)')'power deadband'
       endif
 
+C     (12)
+C     Read the grid rate toggle
+C       0 ... bGridRateLow is set .false.
+C       1 ... bGridRateLow is set .true.
+C       2 ... grid rate is read from file, two additional lines are
+C             read:
+C             1) GridRateThreshold value (real number) and
+C             2) valid file name with grid rate values
+      call stripc(ireselecfl_ascii,outstr,0,nd,1,
+     &                                  'grid rate toggle',ier)
+      if ( ier .ne. 0 ) then
+        write(iuout,*) 'File read error reading grid rate toggle'
+        bFileError = .true.
+      endif
+      k = 0
+      call egetwr(outstr,k,iGridRateToggle,0,2,
+     &                           'W','grid rate toggle',ier)
+      if ( ier .ne. 0 ) then
+        write(iuout,*) 'Error reading grid rate toggle'
+        bFileError = .true.
+        write(cErrLoc,'(A)')'grid rate toggle'
+      endif
+
+      if (iGridRateToggle .eq.2) then
+C       Read GridRateThreshold value
+        call stripc(ireselecfl_ascii,outstr,0,nd,1,
+     &                                  'grid rate threshold',ier)
+        if ( ier .ne. 0 ) then
+          write(iuout,*) 'File read error reading grid rate threshold'
+          bFileError = .true.
+        endif
+        k = 0
+        call egetwr(outstr,k,GridRateThreshold,0.,2.,
+     &                           'W','grid rate threshold',ier)
+        if ( ier .ne. 0 ) then
+          write(iuout,*) 'Error reading grid rate threshold'
+          bFileError = .true.
+          write(cErrLoc,'(A)')'grid rate threshold'
+        endif
+
+C       Read data file name
+        call stripc(ireselecfl_ascii,outstr,0,nd,1,
+     &                               'grid rate data filename',ier)
+        if ( ier .ne. 0 ) then
+          write(iuout,*)
+     &       'File read error reading grid rate data filename'
+          bFileError = .true.
+        endif
+
+        iFIL_GridRate=1
+        write(fnamBDFlds(iFIL_GridRate),'(A)')
+     &      outstr(1:lnblnk(outstr))
+
+      endif ! GridRateToggle .eq. 2
+
+C     (13)
+C     Read the file name for PV refund rate
+C       0 ... bGridRefundHigh is set .false.
+C       1 ... bGridRefundHigh is set .true.
+C       2 ... grid refund is read from file, two additional lines are
+C             read:
+C             1) GridRefundThreshold value (real number) and
+C             2) valid file name with grid refund values
+      call stripc(ireselecfl_ascii,outstr,0,nd,1,
+     &                                  'grid refund toggle',ier)
+      if ( ier .ne. 0 ) then
+        write(iuout,*) 'File read error reading grid refund toggle'
+        bFileError = .true.
+      endif
+      k = 0
+      call egetwr(outstr,k,iGridRefundToggle,0,2,
+     &                           'W','grid refund toggle',ier)
+      if ( ier .ne. 0 ) then
+        write(iuout,*) 'Error reading grid refund toggle'
+        bFileError = .true.
+        write(cErrLoc,'(A)')'grid refund toggle'
+      endif
+
+      if (iGridRefundToggle .eq.2) then
+C     Read GridRefundThreshold value
+        call stripc(ireselecfl_ascii,outstr,0,nd,1,
+     &                                  'grid refund threshold',ier)
+        if ( ier .ne. 0 ) then
+          write(iuout,*) 'File read error reading grid refund threshold'
+          bFileError = .true.
+        endif
+        k = 0
+        call egetwr(outstr,k,GridRefundThreshold,0.,2.,
+     &                           'W','grid refund threshold',ier)
+        if ( ier .ne. 0 ) then
+          write(iuout,*) 'Error reading grid refund threshold'
+          bFileError = .true.
+          write(cErrLoc,'(A)')'grid refund threshold'
+        endif
+
+C       Read data file name
+        call stripc(ireselecfl_ascii,outstr,0,nd,1,
+     &                               'grid refund data filename',ier)
+        if ( ier .ne. 0 ) then
+          write(iuout,*)
+     &       'File read error reading grid refund data filename'
+          bFileError = .true.
+        endif
+
+        iFIL_GridRefund=2
+        write(fnamBDFlds(iFIL_GridRefund),'(A)')
+     &      outstr(1:lnblnk(outstr))
+
+      endif ! iGridRefundToggle .eq. 2
+
+      !-------------------------------!
+      ! Mode 3                        !
+      !-------------------------------!
       elseif (RES_elec_ctl_mode .eq.3) then
 C     << to be defined >>
 
@@ -989,8 +1228,437 @@ cx     &      powcomnam(IPWC)(1:iNameLength))
       end
 
 
+C *********************************************************************************************
+C ******************************* CreateBinaryDataFile ****************************************
+C Created by: Achim Geissler
+C Initial Creation Date: July 7, 2014
+C Copyright FHNW
+C
+C This subroutine is based on cetc/FC_components.F::FC_eloads_convert. 
+C It checks the integrity of the user-specified data file and produces a binary format 
+C data file that can be used for direct access during the time-step simulation. 
+C This subroutine is executed once per simulation, prior to the time-step calculations.
+C -------------------------------------------------------------------------------------------
+      SUBROUTINE CreateBinaryDataFile(iBDF)
+      IMPLICIT NONE
+#include "BinaryDataFile.h"
+
+      integer iBDF
+
+C---------------------------------------------------------------------------------
+C ESP-r commons
+C---------------------------------------------------------------------------------
+      COMMON/FILEP/IFIL
+      INTEGER  IFIL
+
+      COMMON/OUTIN/IUOUT,IUIN
+      INTEGER  IUOUT,IUIN
+
+C---------------------------------------------------------------------------------
+C Declare local variables.
+C---------------------------------------------------------------------------------
+      INTEGER ND,K,num_recs,num_col,num_incbin,inc,incbi,ire
+      integer iFIL_ascii  ! temporary local file number
+      
+      CHARACTER OUTSTR*124
+
+      LOGICAL fclerror
+      LOGICAL bdf_loads_exist
+
+      REAL current,left,right
+      REAL elecload(12),elecloadb(12)
+      INTEGER ISTAT,IER,I
+      INTEGER irec, incbin
+
+C---------------------------------------------------------------------------------
+C Read the header information from the user-specified data file (.fcl)
+C and perform some checks to ensure that the correct number of data
+C are specified. Note that this does not check the validity of the data,
+C but rather ensures that the correct number of data items are specified.
+C The existence of the .fcl file was confirmed when the .cfg file was read.((then why check below??))
+C `fclerror' is a flag indicating whether there were errors reading the .fcl file.
+C---------------------------------------------------------------------------------
+C-----Notify user that data file is being processed (this can take some time).
+      call usrmsg(' Processing BDF type input file...',
+     &            ' ','-')
+C-----Open the .fcl file.
+      fclerror = .false.
+      iFIL_ascii = IFIL+28  ! Should be a safe unit number to use.
+      CALL ERPFREE(iFIL_ascii,ISTAT)
+      CALL EFOPSEQ(iFIL_ascii,fnamBDFlds(iBDF),1,IER)
+      IF(IER /= 0)THEN
+        WRITE(IUOUT,*) ' Error opening BDF type input file, index ',
+     &    iBDF,'.'
+        fclerror = .true.
+      ENDIF
+C-----Read the flag indicating the method used for prescribing the loads.
+      CALL STRIPC(iFIL_ascii,OUTSTR,0,ND,1,' BDF input type',IER)
+      IF(IER /= 0)THEN
+        WRITE(IUOUT,*)
+     &    ' Error reading BDF input type, file index ',iBDF,'.'
+        fclerror = .true.
+      ENDIF
+      K=0
+      CALL EGETWI(OUTSTR,K,iBDF_lds_type(iBDF),1,2,'F',
+     &                                        ' BDF loads type ',IER)
+      IF(IER /= 0)THEN
+        WRITE(IUOUT,*)
+     &    ' Error reading BDF loads input type, file index ',iBDF,'.'
+        fclerror = .true.
+      ENDIF
+C-----Read the number of data points specified for each record of loads data.
+C-----Ensure that the maximum number of data points has not been exceeded
+C-----for the selected input method.
+      CALL STRIPC(iFIL_ascii,OUTSTR,0,ND,1,' BDF loads per hour',IER)
+      IF(IER /= 0)THEN
+        WRITE(IUOUT,*)
+     &    ' Error reading number of data items per record,',
+     &    ' file index ',iBDF,'.'
+        fclerror = .true.
+      ENDIF
+      K=0
+      CALL EGETWI(OUTSTR,K,BDF_lds_per_rec(iBDF),1,12,'F',
+     &            ' FC loads per rec ',IER)
+      IF(IER /= 0)THEN
+        WRITE(IUOUT,*)
+     &  ' Error reading number of data items per record, file index ',
+     &    iBDF,'.'
+        fclerror = .true.
+      ENDIF
+C-----Check that the correct number of loads per record are present
+C-----and set number of records. 
+      SELECT CASE (iBDF_lds_type(iBDF))
+        CASE(BDF_lds_annual)
+          if( BDF_lds_per_rec(iBDF) > BDF_lds_per_rec_annual )then
+            WRITE(IUOUT,*)
+     &        ' Too many data items per record, file index ',iBDF,'.'
+            fclerror = .true.
+          endif
+          num_recs = 8760
+        CASE(BDF_lds_daily)
+          if( BDF_lds_per_rec(iBDF) > BDF_lds_per_rec_daily )then
+            WRITE(IUOUT,*)
+     &        ' Too many data items per record, file index ',iBDF,'.'
+            fclerror = .true.
+          endif
+          num_recs = 1440
+        CASE DEFAULT
+          fclerror = .true.
+      END SELECT
+
+C-----Check that correct number of records is present.
+      DO I=1,num_recs
+        CALL STRIPC(iFIL_ascii,OUTSTR,99,num_col,1,
+     &              ' Test read of a record',IER)
+        if(IER /= 0)then
+          WRITE(IUOUT,*) ' End of fuel cell elec loads file.'
+          fclerror = .true.
+        endif
+        if( num_col/=BDF_lds_per_rec(iBDF) )then
+          WRITE(IUOUT,*) ' Incorrect number of data items per record.'
+          fclerror = .true.
+        endif
+      END DO
+
+C-----Error handling on reading of .fcl file.
+      IF(fclerror)THEN
+        STOP ' Error in elec loads input file.'
+      ENDIF
+
+C-----Reposition .fcl file file to the first record containing loads data.
+      REWIND(iFIL_ascii)
+      DO I=1,2
+        CALL STRIPC(iFIL_ascii,OUTSTR,0,ND,1,' skip header',IER)
+      END DO
+
+
+C---------------------------------------------------------------------------------
+C Open a file with direct access (i.e. a binary file) that will be used during
+C the time-step simulation to set the electrical load on the fuel cell. This
+C temporary file will be deleted following completion of the time-step simulation.
+C---------------------------------------------------------------------------------
+      iFIL_BDF(iBDF) =  IFIL+29+iBDF
+      CALL ERPFREE(iFIL_BDF(iBDF),ISTAT)
+      INQUIRE (UNIT=iFIL_BDF(iBDF),EXIST=bdf_loads_exist) ! check if file exists
+      IF (bdf_loads_exist) then
+         CALL EFDELET(iFIL_BDF(iBDF),ISTAT) ! Delete file if it exists
+      endif
+      SELECT CASE (iBDF_lds_type(iBDF))
+        CASE(BDF_lds_annual)
+          CALL FPRAND(iFIL_BDF(iBDF),ISTAT,BDF_lds_per_rec_annual,3,
+     &                'FCloads.tmp')  ! File may exist if prev. simulation was
+                                      ! interrupted
+          BDF_lds_per_rec_bin(iBDF) = BDF_lds_per_rec_annual
+        CASE(BDF_lds_daily)
+          CALL FPRAND(iFIL_BDF,ISTAT,BDF_lds_per_rec_daily,3,
+     &                'FCloads.tmp')
+          BDF_lds_per_rec_bin(iBDF) = BDF_lds_per_rec_daily
+        CASE DEFAULT  
+          ! Clear by now that BDF_lds_type is valid.
+      END SELECT
+
+C---------------------------------------------------------------------------------
+C Iterate through each record in the .fcl ASCII file. For each record of data in
+C .fcl ASCII file, read the load at each time increment specified. Write the
+C loads data to the binary file at the pre-determined time resolution
+C (i.e. 5 minutes for `BDF_lds_annual' and 10 seconds for `BDF_lds_daily'. If user
+C has specified loads at a coarser time increment, then assume the load is
+C constant over a number of time increments when creating the binary file.
+C---------------------------------------------------------------------------------
+
+      DO irec=1,num_recs
+C-------Read the loads data from the ASCII file.
+        READ(iFIL_ascii,*) (elecload(inc),inc=1,BDF_lds_per_rec(iBDF))
+C-------If user time-increment differs from time increment in binary file,
+C-------then spread user data over number of time increments in binary file.
+C-------Uses a step-function approach.
+        DO inc=1,BDF_lds_per_rec(iBDF)
+          DO incbin=1,BDF_lds_per_rec_bin(iBDF)
+            current = float(incbin) / float(BDF_lds_per_rec_bin(iBDF))
+            left    = float(inc-1)  / float(BDF_lds_per_rec(iBDF))
+            right   = float(inc)    / float(BDF_lds_per_rec(iBDF))
+            if( current > left .and. current <= right ) then
+              elecloadb(incbin) = elecload(inc)
+            endif
+          END DO
+        END DO
+C-------Write the loads data to the binary file.
+        WRITE(iFIL_BDF(iBDF),REC=irec,IOSTAT=ISTAT)
+     &       (elecloadb(incbin),incbin=1,BDF_lds_per_rec_bin(iBDF))
+      END DO
+C-----Write header information at end of binary file.
+      WRITE(iFIL_BDF(iBDF),REC=8761,IOSTAT=ISTAT)
+     &      iBDF_lds_type(iBDF),BDF_lds_per_rec(iBDF)
+
+C Processing complete. Leave binary file open for use during time-step simulation.
+      call usrmsg(' Processing input file... done.',
+     &            ' ','-')
+
+      RETURN
+      END
+
+
+C *********************************************************************************************
+C ******************************* ReadBinaryDataFile ******************************************
+C Created by: Achim Geissler
+C Initial Creation Date: July 7, 2014
+C Copyright FHNW
+C
+C This subroutine is based on FC_eloads_establish and retrieves the data value for the current 
+C time-step. This subroutine reads the data value from the binary file created by
+C CreateBinaryDataFile.
+C This subroutine is executed each time the RES (elec) control subroutine "xxx" is executed, 
+C which may be multiple times per plant simulation increment.
+
+C -------------------------------------------------------------------------------------------
+C INPUT:
+C     iBDF             Index for BDF file
+C
+C OUTPUTS:
+C     CurrentValue     The non-HVAC electrical load for the current plant simulation
+C                      increment (W).
+C -------------------------------------------------------------------------------------------
+      SUBROUTINE ReadBinaryDataFile(iBDF,CurrentValue)
+      IMPLICIT NONE
+#include "BinaryDataFile.h"
+
+C     Subroutine parameters
+      integer iBDF
+      real CurrentValue
+
+C-------------------------------------------------------------------------------
+C     ESP-r commons
+C-------------------------------------------------------------------------------
+      COMMON/OUTIN/IUOUT,IUIN           ! Number for default output and input screens
+      INTEGER  IUOUT,IUIN
+
+C Common holding simulation type (building, building+plant, or plant-only simulation)
+      integer indcfg
+      common/c6/indcfg
+
+C---------------------------------------------------------------------------------
+C Commons holding simulation time-clock variables.
+C---------------------------------------------------------------------------------
+      COMMON/SIMTIM/IHRP,IHRF,IDYP,IDYF,IDWP,IDWF,NSINC,ITS
+      INTEGER IHRP,IHRF,IDYP,IDYF,IDWP,IDWF,NSINC,ITS
+      
+
+      common/btime/btimep,btimef
+      common/ptime/ptimep,ptimef
+      REAL BTIMEP,btimef,PTIMEP,ptimef
+
+C---------------------------------------------------------------------------------
+C Declare local variables.
+C---------------------------------------------------------------------------------
+      INTEGER record,incbin,after_midnight
+      REAL elecloadb(12),frac_hr,frac_min,tenth
+      REAL q_nonHVAC_elec
+      LOGICAL CLOSE,dll,XST
+      character    dllsubr*12,dllmesg*124,outs*124
+      integer ISTAT,itu
+      REAL fFuture_Time           ! time on future time row.
+
+C-------------------------------------------------------------------------------------------
+C From: esrupfs/powow_calc.F, function fGet_nonHVACld(cFileName), line 357 ff.
+C-----
+C If this subroutine is being called for the first time then process the user-specified
+C electrical loads data. Determine data type and convert from ASCII file to binary-format
+C for direct access during simulation.
+C-------------------------------------------------------------------------------------------
+      IF(iBDFlds(iBDF).eq.0) THEN
+cx         fnamBDFlds = cFileName
+         XST=.FALSE.
+         call FINDFIL(fnamBDFlds(iBDF),XST)
+         if(XST)then
+            iBDFlds(iBDF)=1
+         else
+           write(outs,'(3a)')
+     &       'Data file ',fnamBDFlds(iBDF)(1:lnblnk(fnamBDFlds(iBDF))),
+     &                       ' was referenced but not found.'
+           call isadll(dll)
+           if(dll)then
+             dllsubr='ersys'
+             dllmesg=outs
+             return
+           else
+             call edisp(iuout,outs)
+             STOP ' RES (elec) read data file: unresolvable error.'
+           endif
+         endif
+         CALL CreateBinaryDataFile(iBDF)
+      END IF
+
+C--------------------------------------------------------------------------------
+C Determine the time corresponding to future time row
+C--------------------------------------------------------------------------------
+      if ( indcfg .eq. 1 ) then
+C........Building+electrical net simulation --- elec. domain is processed at the
+C........same frequency as building domain. Building time is 'future time'.
+         fFuture_Time = btimef
+
+      elseif ( (indcfg .eq. 2) .or. (indcfg .eq. 3) ) then
+C........Plant+electrical net simulation --- elec. & plant domains are
+C........processed at same frequency. Plant time is 'future time.
+         fFuture_Time = ptimef
+
+      else
+C........Unsupported simulation type. 
+         write (itu,'(A,I2,A)')
+     &    ' ReadBinaryDataFile(): Specified simulation type (', 
+     &                                                 indcfg,')'
+         write (itu,'(A)')
+     &    '                    is unsupported. See powoc_calc.F.'
+         stop 'ReadBinaryDataFile(): Fatal error!'
+      endif
+
+      
+C---------------------------------------------------------------------------------
+C Determine which record of the binary file contains the correct data
+C for the `future' time that is currently being simulated. There are two 
+C possible formats for the binary file: one record for each
+C hour of the year (indicated by `BDF_lds_annual') or one record for each minute
+C of a typical day (indicated by `BDF_lds_daily').
+C---------------------------------------------------------------------------------
+      SELECT CASE (iBDF_lds_type(iBDF))
+
+C---------------------------------------------------------------------------------
+C One record for each hour of the year.
+C The hour of the year defines the record in the file: the first
+C record of the binary file contains the data for 0h00m00s to 0h59m59s of
+C January 1; the 8760th record contains the data for 23h00m00s to 23h59m59s of
+C December 31.
+C Special attention has to be paid when the `future' time in the plant domain
+C crosses over midnight, as the `present' day will not have yet been incremented.
+C When this occurs, the `present' time in the building domain will be 24 hours
+C and the `future' time in the plant domain will be less than or equal to 1 hour.
+C Special attention must also be be paid when the `present' time in the building
+C domain (BTIMEP) crosses over midnight and when sub-hourly building time-steps
+C are used. In this case, the `present' day (IDYP) does not increment until
+C BTIMEP=1.0.
+C The electrical load at 24h00 is taken as the load at 0h00 of the next day
+C (as described above, each record covers the period from 0h00m00s to 23h59m59s).
+C Care has to be taken when the simulation crosses over the New Year: the load for
+C midnight December 31 is set using the data at 0h00 on January 1.
+C---------------------------------------------------------------------------------
+        CASE(BDF_lds_annual)
+C---------Have we just crossed over midnight?
+          CALL ECLOSE(BTIMEP,24.0,0.0001,CLOSE)
+          IF( CLOSE .and. fFuture_Time<=1. )THEN
+            after_midnight = 24
+          ELSEIF( BTIMEP<1.0 )THEN  ! IDYP does not increment until BTIMEP=1.0.
+            after_midnight = 24
+          ELSE
+            after_midnight = 0
+          END IF
+C---------Determine which record to use.
+          record = 24*(IDYP-1)+INT(fFuture_Time)+1+after_midnight
+C---------Has midnight on New Year's eve just struck?
+          CALL ECLOSE(fFuture_Time,24.0,0.0001,CLOSE)
+          IF( CLOSE .and. IDYP==365 )THEN
+            record = record - 8760
+          END IF
+          CALL ECLOSE(BTIMEP,24.0,0.0001,CLOSE)
+          IF( CLOSE .and. fFuture_Time<=1. .and. IDYP==365 )THEN
+            record = record - 8760
+          END IF
+          IF( BTIMEP<1.0 .and. IDYP==365 )THEN ! IDYP does not increment until BTIMEP=1.0.
+            record = record - 8760
+          END IF
+C---------Read the loads for each time increment for the current hour.
+          READ(iFIL_BDF(iBDF),REC=record,IOSTAT=ISTAT)
+     &        (elecloadb(incbin),incbin=1,BDF_lds_per_rec_bin(iBDF))
+C---------Now determine which of these increments corresponds to the current
+C---------time-step. `frac_hr' represents the fraction of an hour that we are
+C---------past the top of the hour.
+          frac_hr = fFuture_Time - AINT(fFuture_Time)             ! AINT truncates a real.
+          incbin = INT(frac_hr*BDF_lds_per_rec_bin(iBDF)+0.001)+1 ! 0.001 prevents rounding error.
+C---------Set the electrical load for the current time-step.
+          CurrentValue = elecloadb(incbin)
+
+C---------------------------------------------------------------------------------
+C One record for each minute of a typical day (used for very short time-step
+C simulations). The minute of the day defines the record in the file: the first 
+C record contains the data for 00h00m00s to 00h00m59s; the 1440th record contains 
+C the data for 23h59m00s to 23h59m59.
+C---------------------------------------------------------------------------------
+        CASE(BDF_lds_daily)
+C---------Determine which record to use.
+          tenth = 0.1 / 60.  ! Tenth of sec: used because fFuture_Time sometimes has rounding errors.
+          record = INT( fFuture_Time*60. + tenth ) + 1
+C---------Has midnight just struck in the plant domain?
+          CALL ECLOSE(fFuture_Time,24.0,0.0001,CLOSE)
+          IF( CLOSE ) record = 1
+C---------Read the loads for each time increment for the current minute.
+          READ(iFIL_BDF(iBDF),REC=record,IOSTAT=ISTAT)
+     &        (elecloadb(incbin),incbin=1,BDF_lds_per_rec_bin(iBDF))
+C---------Now determine which of these increments corresponds to the current
+C---------time-step. `frac_min' represents the fraction of a minute that we are
+C---------past the top of the minute.
+          frac_min = (fFuture_Time*60. + tenth) 
+     &                   - AINT( fFuture_Time*60. + tenth )
+          incbin = INT(frac_min*BDF_lds_per_rec_bin(iBDF)+0.001)+1 ! 0.001 prevents rounding error.
+C---------Set the electrical load for the current time-step.
+          CurrentValue = elecloadb(incbin)
+
+C---------------------------------------------------------------------------------
+        CASE DEFAULT
+          ! This cannot happen as there are error traps upstream.
+      END SELECT
+
+C-----If  is less than or equal to 0., then set to 1. and
+C-----issue warning to user
+      IF(CurrentValue.LE.0.) THEN
+        CurrentValue = 1.
+        WRITE(IUOUT,*) ' Warning: Value from .fcl file ',iBDF,' is'
+        WRITE(IUOUT,*) ' zero on day ',IDYP,' and hour',
+     &  BTIMEP
+      ENDIF
+
+      RETURN
+      END
+
 C===================================================================================
-C============================ RESH2_Ctl_Status_Blockdata ===========================
+C============================ RES_elec_Ctl_Status_Blockdata ===========================
 C
 C SYNOPSYS: Initialization of value of bRESElec_ctl_unconverged flag
 C
@@ -1002,4 +1670,3 @@ C===============================================================================
       logical bRESElec_ctl_unconverged         !-logical flag indicating additional iterations req'd
       data bRESElec_ctl_unconverged/.false./   !initial value
       end blockdata reselec_ctl_status_blockdata
-
