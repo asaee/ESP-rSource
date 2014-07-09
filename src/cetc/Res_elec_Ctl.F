@@ -986,31 +986,31 @@ C             read:
 C             1) GridRateThreshold value (real number) and
 C             2) valid file name with grid rate values
       call stripc(ireselecfl_ascii,outstr,0,nd,1,
-     &                                  'grid rate toggle',ier)
+     &                              'grid rate toggle stripc',ier)
       if ( ier .ne. 0 ) then
         write(iuout,*) 'File read error reading grid rate toggle'
         bFileError = .true.
       endif
       k = 0
-      call egetwr(outstr,k,iGridRateToggle,0,2,
-     &                           'W','grid rate toggle',ier)
+      call egetwi(outstr,k,iGridRateToggle,0,2,
+     &                           'W','grid rate toggle egetwi',ier)
       if ( ier .ne. 0 ) then
         write(iuout,*) 'Error reading grid rate toggle'
         bFileError = .true.
         write(cErrLoc,'(A)')'grid rate toggle'
       endif
 
-      if (iGridRateToggle .eq.2) then
+      if (iGridRateToggle .eq. 2) then
 C       Read GridRateThreshold value
         call stripc(ireselecfl_ascii,outstr,0,nd,1,
-     &                                  'grid rate threshold',ier)
+     &                             'grid rate threshold stripc',ier)
         if ( ier .ne. 0 ) then
           write(iuout,*) 'File read error reading grid rate threshold'
           bFileError = .true.
         endif
         k = 0
         call egetwr(outstr,k,GridRateThreshold,0.,2.,
-     &                           'W','grid rate threshold',ier)
+     &                         'W','grid rate threshold egetwr',ier)
         if ( ier .ne. 0 ) then
           write(iuout,*) 'Error reading grid rate threshold'
           bFileError = .true.
@@ -1028,7 +1028,7 @@ C       Read data file name
 
         iFIL_GridRate=1
         write(fnamBDFlds(iFIL_GridRate),'(A)')
-     &      outstr(1:lnblnk(outstr))
+     &                             outstr(1:lnblnk(outstr))
 
       endif ! GridRateToggle .eq. 2
 
@@ -1041,14 +1041,14 @@ C             read:
 C             1) GridRefundThreshold value (real number) and
 C             2) valid file name with grid refund values
       call stripc(ireselecfl_ascii,outstr,0,nd,1,
-     &                                  'grid refund toggle',ier)
+     &                              'grid refund toggle stripc',ier)
       if ( ier .ne. 0 ) then
         write(iuout,*) 'File read error reading grid refund toggle'
         bFileError = .true.
       endif
       k = 0
-      call egetwr(outstr,k,iGridRefundToggle,0,2,
-     &                           'W','grid refund toggle',ier)
+      call egetwi(outstr,k,iGridRefundToggle,0,2,
+     &                          'W','grid refund toggle egetwi',ier)
       if ( ier .ne. 0 ) then
         write(iuout,*) 'Error reading grid refund toggle'
         bFileError = .true.
@@ -1430,6 +1430,9 @@ C-----Write header information at end of binary file.
       WRITE(iFIL_BDF(iBDF),REC=8761,IOSTAT=ISTAT)
      &      iBDF_lds_type(iBDF),BDF_lds_per_rec(iBDF)
 
+C-----Set flag to "file created"
+      iBDFlds(iBDF)=1
+
 C Processing complete. Leave binary file open for use during time-step simulation.
       call usrmsg(' Processing input file... done.',
      &            ' ','-')
@@ -1498,6 +1501,9 @@ C-------------------------------------------------------------------------------
       integer ISTAT,itu
       REAL fFuture_Time           ! time on future time row.
 
+C--------
+      integer lnblnk
+
 C-------------------------------------------------------------------------------------------
 C From: esrupfs/powow_calc.F, function fGet_nonHVACld(cFileName), line 357 ff.
 C-----
@@ -1506,9 +1512,8 @@ C electrical loads data. Determine data type and convert from ASCII file to bina
 C for direct access during simulation.
 C-------------------------------------------------------------------------------------------
       IF(iBDFlds(iBDF).eq.0) THEN
-cx         fnamBDFlds = cFileName
          XST=.FALSE.
-         call FINDFIL(fnamBDFlds(iBDF),XST)
+         call FINDFIL(fnamBDFlds(iBDF)(1:lnblnk(fnamBDFlds(iBDF))),XST)
          if(XST)then
             iBDFlds(iBDF)=1
          else
