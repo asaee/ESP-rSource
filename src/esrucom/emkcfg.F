@@ -776,6 +776,17 @@ C Write control file if known.
      &    LCTLF(1:lnblnk(LCTLF))
       endif
 
+C Write optional additional control files here to keep directly
+C control-functionality files close together
+C Residential hydrogen cogen control file
+cx ... could/should be added here, surely?
+
+C Renewable energy system (elec) controller control file
+      if(ireselecctl.gt.0.and.reselecflnam(1:2).ne.'  ')then
+        WRITE(IFCFG,'(2A)',IOSTAT=IOS,ERR=2) '*resel  ',
+     &    reselecflnam(1:lnblnk(spflnam))
+      endif
+
 C Write model contents file if known.
       if(lnblnk(lmodelqa).eq.0)then
         continue
@@ -1113,15 +1124,6 @@ C Special materials and electrical bus description files.
       if(ientxist.gt.0)then
         WRITE(IFCFG,'(2A)',IOSTAT=IOS,ERR=2) '*pnt  ',
      &    entflnam(1:lnblnk(entflnam))
-      endif
-
-C Residential hydrogen cogen control file
-cx ... should be added here, surely?
-
-C Renewable energy system (elec) controller control file
-      if(ireselecctl.gt.0.and.reselecflnam(1:2).ne.'  ')then
-        WRITE(IFCFG,'(2A)',IOSTAT=IOS,ERR=2) '*resel  ',
-     &    reselecflnam(1:lnblnk(spflnam))
       endif
 
 C Write temporal file information. Check to see if an
