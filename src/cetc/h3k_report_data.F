@@ -3488,6 +3488,11 @@ C.....Total generation (onsite)
      &         rvElecNetGenOnsiteGeneration%Identifier,
      &         elec_net_load_calc(total_gen))
 
+C...... This adds total on site electricity  generation for CHREM use
+      call AddToReport(
+     &         rvElecCHREMNetGenOnsiteGeneration%Identifier,
+     &         elec_net_load_calc(total_gen))
+
 C.....Total generation (offsite)
       call AddToReport(
      &      rvElecNetGenOffsiteGeneration%Identifier,
@@ -3548,6 +3553,11 @@ C.....-> update data
 C.....Net grid export
          call AddToReport(
      &         rvElecNetGridNetBalance%Identifier,
+     &         elec_net_load_calc(balance))
+
+C this line is to report the available electricity balance for CHREM.
+         call AddToReport(
+     &         rvElecCHREMNetGridNetBalance%Identifier,
      &         elec_net_load_calc(balance))
 
 C.....Dump load/generated/transmitted power for each node in

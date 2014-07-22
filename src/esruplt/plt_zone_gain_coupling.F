@@ -107,6 +107,9 @@ C----------------------------------------------------------------------
 C----------------------------------------------------------------------
 C     ESP-r commons
 C----------------------------------------------------------------------
+      COMMON/PCRES/QDATA(MPCOM)
+      REAL QDATA
+
 C.....Input/output
       common/outin/iuout,iuin
       integer iuout, iuin      ! channels for writing messages to screen
@@ -460,7 +463,7 @@ C..............have been error trapped above.
 C.................Zone air point containment.
                   fZone_Gains(iZone,iConvective,iFuture) =
      &               fZone_Gains(iZone,iConvective,iFuture)
-     &             + fPltComp_Gains( iComponent, iConvective )
+     &             + fPltComp_Gains( iComponent, iConvective )  
                   fZone_Gains(iZone,iRadiant ,iFuture) =
      &               fZone_Gains(iZone,iRadiant ,iFuture)
      &             + fPltComp_Gains( iComponent, iRadiant )
@@ -605,8 +608,7 @@ C----------------------------------------------------------------------
          call edisp (iuout, cMsg )
          stop "plt_zone_gain_inventory(): Unresolvable error"
       endif
-
-
+      
       return
       end 
 

@@ -436,6 +436,9 @@ C---- ESP-r Common blocks
      & IPC2(MPCON),IPN2(MPCON),PCONDR(MPCON),PCONSD(MPCON,2)
       INTEGER NPCON,IPC1,IPN1,IPCT,IPC2,IPN2
       REAL PCONDR,PCONSD
+      
+      COMMON/C12PS/NPCDAT(MPCOM,9)
+      INTEGER NPCDAT
 
       COMMON/PCRES/QDATA(MPCOM),PCAOUT(MPCOM,MPCRES),NAPDAT(MPCOM)
       REAL QDATA,PCAOUT
@@ -508,6 +511,7 @@ C---- Local variables
                                 ! stratified_tank
       INTEGER ICON1             ! Pointer to inter-connection 1
       INTEGER ICON2             ! Pointer to inter-connection 2
+      INTEGER INOD2             ! Pointer to node 2
       INTEGER I,J               ! Counters
 
 C     Outputs of model
@@ -522,6 +526,11 @@ C     Dummy variables
       LOGICAL HASHX1            ! Indicates presence of HX1 (.FALSE.)
       LOGICAL HASHX2            ! Indicates presence of HX2 (.FALSE.)
       REAL DUMMY                ! Dummy variable
+      
+C Variables use to inject heat loss from FC-cogen device to room.
+      REAL heat_to_room         ! Heat transfer to room (W).
+      REAL heat_to_room_conv    ! Convective portion of heat transfer(W)
+      REAL heat_to_room_rad     ! Radiative portion of heat transfer(W)
 
 C---- Functions
       REAL SHTFLD
@@ -556,6 +565,7 @@ C---- Initialize pointers to inter-connection(s) ICON, and node(s) INOD.
 
       ICON1=ICONDX(IPCOMP,1,1)
       ICON2=ICONDX(IPCOMP,2,1)
+      INOD2=NPCDAT(IPCOMP,9)+1
 
 C---- Identify variables
 
@@ -654,11 +664,28 @@ C---- Additional outputs
       PCAOUT(IPCOMP,3) = STEPCOUNT
       PCAOUT(IPCOMP,4) = MIXCOUNT
       PCAOUT(IPCOMP,5) = NSECAVG
-
+      
+C---------------------------------------------------------------------
+C Determine the convective and radiative split and call the routine 
+C that stores these heat transfer rates for subsequent injection into
+C the zone energy balances. 'iConvective' and 'iRadiant' are parameters
+C defined in plant.h.
+C---------------------------------------------------------------------
+        heat_to_room_conv = (MDOT1*CP*(TIN1-TOUT1)) - 
+     &   (MDOT2*CP*(TOUT2-TIN2)) 
+        CALL STORE_PLT_GAIN (IPCOMP, heat_to_room_conv, iConvective)
+      
 C---- XML output
       call AddToReport(rvPltAvgTemp%Identifier,
      &      TAVGF_STANK(I_STANK),
      &       pcname(ipcomp)(1:iPltNameLen(ipcomp)))
+ 
+C....This line adds energy delivered to each flow stream for CHREM.    
+      call AddToReport(rvPltCHREMstrtanknHXQ1%Identifier,
+     &      MDOT1*CP*(TIN1-TOUT1))
+     
+      call AddToReport(rvPltCHREMstrtanknHXQ2%Identifier,
+     &      MDOT2*CP*(TOUT2-TIN2))
 
 C---- Trace output
 
@@ -1310,6 +1337,7 @@ C     the calculation of the right-hand side
         QLoss = QLoss + Mdot1*Cp*(TIn1-TBoil)*dt
       endif
       if (QLoss .GT. 0.) then
+        write(*,*), TIn0, Mdot0
         write(6,*) 'Warning: stratified tank model'
         write(6,*) 'Boiling temperature of fluid exceeded!'
         write(6,*) 'Please check components leading to tank'
@@ -1830,10 +1858,10 @@ C     Non-dimensional numbers of fluid inside HX
       REAL    f            ! auxiliary coefficient in the calculation of Nu
       REAL    A            ! auxiliary coefficient in the calculation of Nu
 C     Heat transfer coefficients between HX fluid and tank fluid
-      REAL    h_int        ! heat transfer coefficient, inside of pipe [W/m^2/K]
-      REAL    R_wall       ! pipe thermal resistance per unit lenght [m K/W]
-      REAL    h_ext        ! heat transfer coefficient, outside of pipe [W/m^2/K]
-      REAL    U            ! overall heat transfer coefficient [W/m^2/K]
+      REAL    U_int        ! heat transfer coefficient, inside of pipe [W/m/K]
+      REAL    U_wall       ! heat transfer coefficient through pipe [W/m/K]
+      REAL    U_ext        ! heat transfer coefficient, outside of pipe [W/m/K]
+      REAL    U            ! overall heat transfer coefficient [W/m/K]
       LOGICAL CLOSEA       ! Auxiliary variable
 
 C     Thermophysical properties of tank fluid
@@ -1883,11 +1911,8 @@ C-----------------------------------------------------------------------
 C---- There is no flow: nothing to do
       CALL ECLOSE(MdotHX,0.0,1.0E-15,CLOSEA)
       if (CLOSEA) then
-C Set flow to a low value to allow heat transfer between coil and wider tank volume to be calculated, 
-C to allow coil cooling when the coil flow is zero.
-         MDotHX=1E-6
-c        TOutHX = TInHX
-c        RETURN
+        TOutHX = TInHX
+        RETURN
       endif
 
 C---- Calculate the nodes where the HX is located
@@ -2009,13 +2034,13 @@ C           Hemisphere (1990) eq. 12 and 13
             Nu = A*Nu_crit+(1.-A)*Nu_turb
           endif
 C----     Convert Nu into thermal conductance, expressed per unit length of coil
-          h_int = Nu*k/DinHX
+          U_int = Nu*k/DinHX
 
 
-C================= Resistance per unit lenght of heat through wall of coil ===============
-C         
+C================= Conduction of heat through wall of coil ===============
+C         Kreith and Bohn, 2001, eq. 2.39
 
-          R_wall = 1/(2*PI*kHX)*log(DoutHX/DinHX)
+          U_wall = 2*PI*kHX/log(DoutHX/DinHX)
 
 
 C================= Outside of coil ===============
@@ -2067,14 +2092,14 @@ C----     Mixed convection
 C         Incropera & DeWitt (1990), eq. 9.64
           Nu_m = ((Nu_n ** 3.) + (Nu_f ** 3.)) ** (1./3.)
 
-C----     Calculate heat transfer coefficient, h_ext
-          h_ext = Nu_m*k_s/DoutHX
+C----     Calculate thermal conductance, U_ext
+          U_ext = Nu_m*k/DoutHX
 
 C======== Calculate heat transfer from HX fluid to tank ===============================
 C----     Calculate total conductance, per unit length of coil
 C         For safety, check U_int and U_ext. Experience shows that U_ext may be zero
 C         in very rare circumstances
-          U = 1./(1./h_int + pi*DinHX*R_wall + DinHX/(h_ext*DoutHX))
+          U = 1./(1./U_int + 1./U_wall + 1./U_ext)
           Htop = max(HInHX, HOutHX)
           Hbot = min(HInHX, HOutHX)
           Hhx = min(i*NodeHeight, Htop)
@@ -2100,8 +2125,8 @@ C         which is simplified using the expression for THXout above
           THX = Ts + LMTD             ! this is the average HX fluid temperature
 
 C----     Update inside and outside wall temperatures, for next iteration
-          Twall_i = THX - U*(THX-Ts)/h_int
-          Twall_o = Ts + U*DinHX*(THX-Ts)/(h_ext*DoutHX)
+          Twall_i = THX - U*(THX-Ts)/U_int
+          Twall_o = Ts + U*(THX-Ts)/U_ext
 
 C----     End of iterative loop
         end do

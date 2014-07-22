@@ -69,7 +69,7 @@ C----------------------------------------------------------------------
 C.....Types of gains      
       integer iConductive, iConvective, iRadiant 
       parameter ( iConvective=1, iRadiant=2, iConductive=3)
-
+      
 C ============ Commons ==========================================
 C Standard common variables
 C ===============================================================

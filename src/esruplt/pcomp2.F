@@ -651,9 +651,6 @@ C     CDATA: none
      &             PCNTMP(MPCOM)
       COMMON/PCOND/CONVAR(MPCON,MCONVR),ICONTP(MPCON),
      &             ICONDX(MPCOM,MNODEC,MPCONC)
-      COMMON/PCRES/QDATA(MPCOM),PCAOUT(MPCOM,MPCRES),napdat(mpcom)
-      REAL QDATA,PCAOUT
-      INTEGER napdat
 
       PARAMETER (SMALL=1.0E-15)
       REAL      COUT(MPCOE)
@@ -741,7 +738,6 @@ C Set up implicit/explicit weighting factor ALPHA (1 = fully implicit)
 C Establish matrix equation self- and cross-coupling coefficients
          COUT(1)=ALPHA*(-C1-UA)-CM/TIMSEC
          COUT(2)=ALPHA*C1
-
 C and then present-time coefficient (ie. right hand side)
          COUT(3)=((1.-ALPHA)*(PCRP(ICON1)+PUAP(INOD1))
      &              -CM/TIMSEC)*CSVP(INOD1,1)
@@ -753,10 +749,6 @@ C Store "environment" variables future values
          PUAF(INOD1)=UA
          PCTF(ICON1)=CONVAR(ICON1,1)
          PCRF(ICON1)=C1
-
-C Establish "containment loss" data
-        QDATA(IPCOMP)=UA*(alpha*(csvf(inod1,1)-pcntmf(ipcomp))+
-     &                (1.-alpha)*(csvp(inod1,1)-pcntmp(ipcomp)))
 
 C 1st phase mass (ie. water) balance coefficients
       ELSE IF(ISTATS.EQ.2) THEN
@@ -1256,6 +1248,9 @@ C            1 Holds boiler actual ON/OFF state (-)
 C            2 Inter-node fluid heat capacity rate (W/K)
 
       SUBROUTINE CMP25C(IPCOMP,COUT,ISTATS)
+      
+      use h3kmodule
+      
 #include "plant.h"
 #include "building.h"
 
@@ -1331,15 +1326,12 @@ C so mark node 1 temperature for iteration
 
 C Establish whether boiler is on or off (ie 1 or 0)
          IONOFF=int(CDATA(IPCOMP,1))
-
 C Reset to off in case maximum temperature exceeded
          IF(CSVF(INOD2,1).GE.BDATA(IPCOMP,10)) IONOFF=0
-
 C Then calculate heat input into the water PHIW for ON or OFF
          IF(IONOFF.EQ.1) THEN
             PHISB=0.
             FGAS=BDATA(IPCOMP,1)
-
 C Adjust efficiency for start-stop losses if the boiler was off
 C during the previous time-step
             IF(NINT(PCDATP(IPCOMP,1)).EQ.0) THEN
@@ -1361,10 +1353,8 @@ C Establish heat capacity of component mass CM (J/K) and
 C fluid heat capacity rate(s) C (W/K), ie. SUM(mass flow * specific heat)
          CM=ADATA(IPCOMP,1)*ADATA(IPCOMP,2)/2.
          C1=PCONDR(ICON1)*CONVAR(ICON1,2)*SHTFLD(3,CONVAR(ICON1,1))
-
 C Boiler actual ON/OFF state PCDATF(IPCOMP,1) (-)
          PCDATF(IPCOMP,1)=IONOFF
-
 C Inter-node fluid heat capacity rate (W/K)
          PCDATF(IPCOMP,2)=CSVF(INOD1,2)*SHTFLD(3,CSVF(INOD1,1))
 
@@ -1420,6 +1410,17 @@ C Establish additional output variables
          PCAOUT(IPCOMP,3)=ETA
          PCAOUT(IPCOMP,4)=PHIW
          PCAOUT(IPCOMP,5)=PHISB
+
+C-------------------------------------------------------------------
+C...This line adds the condensing boiler fuel consumption for CHREM.         
+       call AddToReport(rvPltCHREMcondboilerfueluse%Identifier,
+     &          PCAOUT(IPCOMP,2))         
+
+C...This line adds the condensing boiler energy of consumed fuel for CHREM.         
+       call AddToReport(rvPltCHREMcondboilerfuelenergy%Identifier,
+     &          PCAOUT(IPCOMP,2)*BDATA(IPCOMP,3))         
+
+C--------------------------------------------------------------------
 
 C 1st phase mass (ie. water) balance coefficients
       ELSE IF(ISTATS.EQ.2) THEN
@@ -2381,6 +2382,9 @@ C     BDATA: 1 Coil internal heat transfer surface area (m^2)
 C            2 Coil internal heat transfer coefficient (W/m^2K)
 C            3 Coil external heat transfer surface area (m^2)
 C            4 Coil external heat transfer coefficient (W/m^2k)
+C
+
+
 
       SUBROUTINE CMP31C(IPCOMP,COUT,ISTATS)
 #include "plant.h"
@@ -2500,11 +2504,9 @@ C Establish matrix equation self-coupling coefficients,
          COUT(2)=ALPHA*H
          COUT(3)=ALPHA*H
          COUT(4)=ALPHA*(-C2-H)-CW/TIMSEC
-
 C then matrix equation cross-coupling coefficients,
          COUT(5)=ALPHA*C1
          COUT(6)=ALPHA*C2
-
 C and then present-time coefficients (ie. right hand sides)
          COUT(7)=((1.-ALPHA)*(PCRP(ICON1)+PUAP(INOD1)+H)-CM/TIMSEC)
      &           *CSVP(INOD1,1)
@@ -2524,10 +2526,7 @@ C Store "environment" variables future values
          PCRF(ICON2)=C2
 
 C Establish "containment loss" data
-        presentTemp=0.5*(csvp(inod1,1)+csvp(inod2,1))
-        futureTemp =0.5*(csvf(inod1,1)+csvf(inod2,1))
-        QDATA(IPCOMP)=UA*(alpha*(futureTemp-pcntmp(ipcomp))+
-     &                (1.-alpha)*(presentTemp-pcntmp(ipcomp)))
+         QDATA(IPCOMP)=0.
 
 C Establish additional output variables
          QCOIL=H*(CSVF(INOD2,1)-CSVF(INOD1,1))
@@ -4251,6 +4250,7 @@ C
 
 
 C Electrical details for specified plant components
+      common/pcelflg/ipcelf(mpcom)
       common/elpcp/NPEL,PFP(mpcom),IPFP(mpcom),PWRP(mpcom),
      &BVOLTP(mpcom),IPHP(mpcom)
 
@@ -5529,7 +5529,7 @@ C            2 Model coef a0
 C            3 Model coef a1
 C            4 Model coef a2
 C	     5 Model coef a3
-C            6 Device power draw (kW) model [1 - fixed 2- polynomial 3-exponential b0*e^(b1)]
+C            6 Device power draw (kW) model [1 - fixed 2- polynomial]
 C            7 Model coef b0
 C            8 Model coef b1
 C            9 Model coef b2
@@ -5613,17 +5613,8 @@ C water outlet temperature and ambient temperature compensation can be applied [
 
       COMMON/ASHPvar3/CallforHeat,InDeadB,DefrostLock,InDefrost
 
-C Electrical details for specified plant components
-      common/pcelflg/ipcelf(mpcom)
-      common/elpcp/NPEL,PFP(mpcom),IPFP(mpcom),PWRP(mpcom),
-     &BVOLTP(mpcom),IPHP(mpcom)
-
       REAL SMALL
       PARAMETER (SMALL=1.0E-20)
-
-      REAL PFP,PWRP,BVOLTP,PWRQ,PA,PQ
-
-      INTEGER ipcelf,NPEL,IPFP,IPHP,IEMODEL
 
       LOGICAL CallforHeat,InDeadB,DefrostLock,InDefrost
 
@@ -5818,10 +5809,6 @@ C Calculate the TOTAL device power draw (W)
           Td=ReturnT
           Ta=Tamb
           CompPower=1000.*(Compa0+(Compa1*Ta)+(Compa2*Td))
-        ELSEIF(CompModel.eq.3)THEN
-          Td=ReturnT
-          Ta=Tamb
-          CompPower=1000.*Compa0*EXP(Compa1*(Td-Ta)) !exponential power consumption.
         ENDIF
         if(CompPower.LT.0.0)CompPower=0.0
 
@@ -5889,13 +5876,6 @@ C Establish heat loss modulus
 C Calculate the electrical demand of the device assumung the controller is ON.
         CtlPower=CtlRating
         TotRealPower=CompPower+CtlPower
-
-C Save the real power draw for use in an electrical power flow simulation. 
-         PWRP(IPCOMP)=-ABS(TotRealPower)
-         IEMODEL=1
-         CALL EMACH(IPCOMP,IEMODEL,PWRP(IPCOMP),PQ,PA)
-         PWRQ=PQ
-
 
 c Calculate the compressor power draw.
         CompressPower=CompPower-(PumpPower+FanPower+CtlPower)
@@ -6240,13 +6220,12 @@ C NTSBO       = total no. of timesteps boiler is to be off due to lockout
       REAL      COUT(MPCOE),TOTMAS,UA,TFLOW,
      & RUBTL,CUTIN,CUTOUT,FEEDTM,SUPPTM,RI,
      & RO,HK,A,TR,ZMFR,Q,PHI,BLKOUT,FGAS,CM,
-     & ALPHA,C1,SHTFLD,UBTL,futureTemp,presentTemp
+     & ALPHA,C1,SHTFLD,UBTL
       character outs*124
       INTEGER ICON1,INOD1,INOD2,IONOFF,ICOMBI,ICCOMP,ICOMBIMOD,ICCN1,
      & IPC,NTSBO,IX1,I,NITMS,IPCON,ISTATS,IPCOMP,IPSND,icon2,idebug
       integer iFuel,ii,iRunOnce,ICL,iii,noTStepsOn,nsincp_local
-      integer debug_counter
-      
+
       real tempAmb,  
      &     effGross,            timeCompOn,
      &     time1stPrePurge,     time2ndPrePurge,   timeIgnStab,
@@ -6258,7 +6237,6 @@ C NTSBO       = total no. of timesteps boiler is to be off due to lockout
       real fFuel_composition ( iCompound_count )
       real fEval_element_mols_in_mixture
       real maxFanFlowrate,airden
-      logical bInStartup
 
 C Trace output
       IF(ITC.GT.0.AND.NSINC.GE.ITC.AND.NSINC.LE.ITCF.AND.
@@ -6280,7 +6258,6 @@ C Check control data for relevant balance type
 C Following code to be run once only
       if(nsinc.eq.1)iRunOnce=0
       if(iRunOnce.eq.0)then
-        nsincp_local=0
         iRunOnce=1 !save iRunOnce
         initTemp=20.
         iFuel=nint(BDATA(IPCOMP,3))
@@ -6288,7 +6265,7 @@ C Following code to be run once only
         ICON1=ICONDX(IPCOMP,1,1)
         INOD1=NPCDAT(IPCOMP,9)
         INOD2=NPCDAT(IPCOMP,9)+1
-	debug_counter=0
+        idebug=0
 
 C Set up real upper boiler temperature limit this will not be modified
         RUBTL=BDATA(IPCOMP,10)
@@ -6371,25 +6348,11 @@ C component sends mass to the boiler
 C End code to be run once only
       endif
 
-C Write debugging information
-      if(bInStartup())then
-        idebug=0
-      else
-        idebug=0
-      endif
-      if(idebug.eq.1)then
-        if(mod(debug_counter,40).eq.0)write(96,*)
-     &    '  plant time    boiler state     tsteps on nsincp',
-     &    '  Q  (heat)       T_flow         eff_gross        T_return',
-     &    '        CDATA'
-	debug_counter=debug_counter+1
-      endif  
-
 C Initialize pointers to inter-connection(s) ICON, and node(s) INOD
       IF(ISTATS.EQ.1) THEN
 
 C Set up upper boiler temperature limit (this can be modified by
-C controllers like the PI room controller (OpenTHERM), OTC  (outside
+C controllers like the PI room controller (OPenTHERM), OTC  (outside
 C temperature compensation) etc.)
         UBTL=BDATA(IPCOMP,10)
 
@@ -6442,13 +6405,11 @@ C Calculate load or heat out fraction
 
 C Reset to off in case GFR is less than CUTOUT or CUTIN as appropriate
       IF(IONOFF.EQ.1)THEN
-        IF(heatOutFrac.GT.1.)heatOutFrac=1.
-        IF(heatOutFrac.LT.CUTOUT)THEN
-          IF((UBTL-TR).LT.10.)THEN
-            heatOutFrac=0.
-            IONOFF=0
-            if(idebug.eq.1)write(96,*)'######### CUTOUT #########'
-          ENDIF
+        IF(heatOutFrac.GT.1.)THEN
+          heatOutFrac=1.
+        ELSEIF(heatOutFrac.LT.CUTOUT)THEN
+          heatOutFrac=0.
+          IONOFF=0
         ENDIF
       ELSE
         IF(heatOutFrac.LT.CUTIN)heatOutFrac=0.
@@ -6460,13 +6421,8 @@ C Update efficiency based on current heatOutFrac
 
 C If boiler temperature reaches real upper boiler temperature limit 
 C it is shut down for amount of time = lock out time
-C Note that the check is made if temperature is 5degC more than the
-C real UBTL to prevent lockout during ignition stabilisation which
-C usually is at a high firing rate (nominally 70%). This has now been
-C modified by skipping ignition stabilisation period and going
-C straight into anti-cycling which resolves the issue somewhat
-      IF(TFLOW.GT.(RUBTL+5.))THEN
-        if(idebug.eq.1)write(96,*)ptimef,'hit UBTL'
+      IF(TFLOW.GT.RUBTL)THEN
+        if(idebug.eq.1)write(96,*)ptimep,'hit UBTL'
         INSO=1
         ITSBO=0
       ENDIF
@@ -6480,8 +6436,7 @@ C straight into anti-cycling which resolves the issue somewhat
         noTStepsOn=0
         IONOFF=0
         if(idebug.eq.1)
-     &write(96,*)ptimef,'Lockout ',noTStepsOn,nsincp,Q,tflow,
-     &effGross,TR,CDATA(IPCOMP,1)
+     &write(96,*)ptimef,'LKO ',noTStepsOn,nsincp,Q,tflow,effGross
       ENDIF
       IF(INSO.EQ.1)GOTO 333
 
@@ -6513,43 +6468,25 @@ C Q is the heat lost due to air purging through boiler =m*Cp*dTemp
             PHI=Q
             FGAS=0.
             if(idebug.eq.1)
-     &      write(96,*)ptimef,'Prepur1 ',noTStepsOn,nsincp,Q,tflow,
-     &      effGross,TR,CDATA(IPCOMP,1)
+     &      write(96,*)ptimef,'PP1 ',noTStepsOn,nsincp,Q,tflow,effGross
           elseif(timeCompOn.le.(time1stPrePurge+time2ndPrePurge))then
             Q=-1.*(maxFanFlowrate*fanRate2ndPP/100.) *
      &      AIRDEN(tempAmb)*1006.*(TFLOW-tempAmb)*BDATA(IPCOMP,21)
             phi=Q
             FGAS=0.
             if(idebug.eq.1)
-     &      write(96,*)ptimef,'Prepur2 ',noTStepsOn,nsincp,Q,tflow,
-     &      effGross,TR,CDATA(IPCOMP,1)
+     &      write(96,*)ptimef,'PP2 ',noTStepsOn,nsincp,Q,tflow,effGross
 
 C No startup routine for non-modulating (on-off) boiler
           elseif(NINT(BDATA(IPCOMP,12)).EQ.0)then
             Q=PHI
             if(idebug.eq.1)
-     &      write(96,*)ptimef,'NonModB ',noTStepsOn,nsincp,Q,tflow,
-     &      effGross,TR,CDATA(IPCOMP,1)
+     &      write(96,*)ptimef,'NMD ',noTStepsOn,nsincp,Q,tflow,effGross
 
 C If in ignition stabilisation time boiler runs at a fixed load 
           elseif(timeCompOn.le.
      &    (time1stPrePurge+time2ndPrePurge+timeIgnStab))then
-
-C If flow temperature is close to real UBTL then skip remainder of
-C ignition stabilisation and go into anti-cycling 
-C set firing rate to anti-cycle rate for this time step as well
-            if(TFlow.GT.(RUBTL-4.0))then
-              heatOutFrac=fRatePerAntiCyc/100.
-              timeCompOn=time1stPrePurge+time2ndPrePurge+timeIgnStab
-              if(idebug.eq.1)
-     &        write(96,*)ptimef,'ModIStab',noTStepsOn,nsincp,Q,tflow,
-     &        effGross,TR,CDATA(IPCOMP,1)
-            else
-              heatOutFrac=fRatePerIgnStab/100.
-              if(idebug.eq.1)
-     &        write(96,*)ptimef,'IgnStab ',noTStepsOn,nsincp,Q,tflow,
-     &        effGross,TR,CDATA(IPCOMP,1)
-            endif            
+            heatOutFrac=fRatePerIgnStab/100.
             PHI=heatOutFrac*PHIMAX
             IF(PHI.LT.0.)PHI=0.
             IF(PHI.GT.PHIMAX)PHI=PHIMAX
@@ -6562,6 +6499,8 @@ C set firing rate to anti-cycle rate for this time step as well
             effGross=BOIL_EFF(TR,heatOutFrac)
             FGAS=PHI/(grossCalorific(iFuel)*effGross)
             Q=PHI
+            if(idebug.eq.1)
+     &      write(96,*)ptimef,'IGS ',noTStepsOn,nsincp,Q,tflow,effGross
 
 C If in anti-cycle time boiler runs at a fixed load
           elseif(timeCompOn.le.
@@ -6580,8 +6519,7 @@ C If in anti-cycle time boiler runs at a fixed load
             FGAS=PHI/(grossCalorific(iFuel)*effGross)
             Q=PHI
             if(idebug.eq.1)
-     &      write(96,*)ptimef,'AntiCyc ',noTStepsOn,nsincp,Q,tflow,
-     &      effGross,TR,CDATA(IPCOMP,1)
+     &      write(96,*)ptimef,'ACT ',noTStepsOn,nsincp,Q,tflow,effGross
 
 C If in normal operation then restrict heating to ramp up gradient
           else
@@ -6601,12 +6539,12 @@ C If in normal operation then restrict heating to ramp up gradient
               effGross=BOIL_EFF(TR,heatOutFrac)
               FGAS=PHI/(grossCalorific(iFuel)*effGross)
 	      Q=PHI
-	      if(idebug.eq.1)write(96,*)ptimef,'NormRam ',noTStepsOn,
-     &        nsincp,Q,tflow,effGross,TR,CDATA(IPCOMP,1)
+	      if(idebug.eq.1)write(96,*)ptimef,'NWR ',noTStepsOn,nsincp,
+     &        Q,tflow,effGross
 	    else
               Q=PHI
-              if(idebug.eq.1)write(96,*)ptimef,'NormNRa ',noTStepsOn,
-     &        nsincp,Q,tflow,effGross,TR,CDATA(IPCOMP,1)
+              if(idebug.eq.1)write(96,*)ptimef,'NNR ',noTStepsOn,nsincp,
+     &        Q,tflow,effGross
             endif
           endif
         endif
@@ -6614,8 +6552,7 @@ C If in normal operation then restrict heating to ramp up gradient
 C Set boiler state to OFF
       ELSE
         if(idebug.eq.1)
-     &  write(96,*)ptimef,'OFF     ',noTStepsOn,nsincp,Q,tflow,
-     &  effGross,TR,CDATA(IPCOMP,1)
+     &  write(96,*)ptimef,'OFF ',noTStepsOn,nsincp,Q,tflow,effGross
         FGAS=0.
         PHI=0.
         Q=0.0
@@ -6699,10 +6636,7 @@ C Store "environment" variables future values
         PCQF(INOD2)=Q
 
 C Establish "containment loss" data
-        presentTemp=0.5*(csvp(inod1,1)+csvp(inod2,1))
-        futureTemp =0.5*(csvf(inod1,1)+csvf(inod2,1))
-        QDATA(IPCOMP)=UA*(alpha*(futureTemp-pcntmf(ipcomp))+
-     &                (1.-alpha)*(presentTemp-pcntmp(ipcomp)))
+        QDATA(IPCOMP)=0.
 
 C If boiler is off set its efficiency to zero
         IF(IONOFF.EQ.0)effGross=0.
@@ -6746,7 +6680,6 @@ C 2nd phase mass (ie. "vapour") balance coefficients
         COUT(6)=0.
       END IF
 
-	!write(96,*)ptimef," boiler ",Q
 C Trace output
       IF(ITC.GT.0.AND.NSINC.GE.ITC.AND.NSINC.LE.ITCF.AND.
      &   ITRACE(37).NE.0) THEN

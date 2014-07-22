@@ -754,10 +754,34 @@ C---- Additional outputs
       PCAOUT(IPCOMP,5) = NSECAVG
       PCAOUT(IPCOMP,6) = QIMMERSED_HX
 
-C---- XML output
+C-------------------------------------------------------------------
+C---- XML output----------------------------------------------------
       call AddToReport(rvPltAvgTemp%Identifier,
      &      TAVGF_STANK(I_STANK),
      &       pcname(ipcomp)(1:iPltNameLen(ipcomp)))
+
+      call AddToReport(rvPltstrtankQHX2%Identifier,
+     &      MDOTHX2*CP*(TOUTHX2-TINHX2),
+     &      pcname(ipcomp)(1:iPltNameLen(ipcomp)))
+
+C......This line adds the heat delivered to second HX for CHREM use.
+      call AddToReport(rvPltCHREMstrtank2HXQ1%Identifier,
+     &      MDOT1*CP*(TIN1-TOUT1))
+
+      call AddToReport(rvPltCHREMstrtank2HXQHX1%Identifier,
+     &      MDOTHX1*CP*(TOUTHX1-TINHX1))
+
+      call AddToReport(rvPltCHREMstrtank2HXQHX2%Identifier,
+     &      MDOTHX2*CP*(TOUTHX2-TINHX2))
+
+      IF (MDOTHX2 .NE. 0) THEN
+	    call AddToReport(rvPltCHREMstrtank2HXTHX2%Identifier,
+     &      TOUTHX2)
+
+	    call AddToReport(rvPltCHREMstrtank2HXTINHX2%Identifier,
+     &      TINHX2)      
+      ENDIF
+C--------------------------------------------------------------------
 
 C---- Trace output
 
