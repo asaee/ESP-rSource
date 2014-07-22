@@ -1,0 +1,124 @@
+#!/bin/bash
+./Install -d ~/esru --no_training --gcc4 --compiler_version -4.4 --xml --silent $@
+#./Install -d ~/esru --no_dbs --no_training --debug --gcc4 --compiler_version -4.1 --xml --silent $@
+#  
+#           ESP-r installation script.
+#  
+#  Please consult the README file before commencing 
+#  installation.  This script will rebuild the ESP-r
+#  modules on your system.  You can abort this process
+#  at any time by pressing <control> c.
+#  
+#  USAGE: Install [OPTIONS] [NAME]
+#  
+#  This installation script can be used to install
+#  ESP-r on your system. To install ESP-r using the 
+#  standard defaults and interactive dialogues, run 
+#  the script without any arguements, eg:
+#  
+#    $ ./Install 
+#  
+#  You can also specify alternate configurations 
+#  using the script's options. For instance, to 
+#  install ESP-r in your home directory, use the
+#  command:
+#  
+#    $ ./Install -d ~/esru
+#  
+#  It is also possible to build esp-r executables 
+#  individually, by specifying the name(s) of the 
+#  desired program(s), eg:
+#  
+#    $ ./Install bps 
+#  
+#  or to install a module in a specific location
+#  
+#    $ ./Install -d ~/esru bps 
+#  
+#  The installation script also supports silent 
+#  (non-interactive) usage, using the '--silent' 
+#  command line argument. Any of the command-line 
+#  arguments specified below can be used in 
+#  combination with the '--silent' option.
+#  
+#  ARGUMENTS: 
+#  
+#     <NAME> to install one or more named modules (e.g.
+#            Install clm for the module clm)
+#  
+#     --compiler_version <STRING>: Append <STRING> to the default
+#         compiler binaries. For instance, to invoke the compiler
+#         binaries gcc-3.4.6, g++-3.4.6, and g77-3.4.6, specify 
+#         '--compiler_version -3.4.6'.
+#         compilation on Apple PPC machines should typically use
+#         '--compiler_version -3.3'.
+#  
+#     -d <PATH>,  --destination <PATH>: Install 
+#         ESP-r in <PATH>/esp-r directory. The 
+#         default path is /usr/esru.
+#  
+#     --debug: Include debugging symbols in executable
+#         the default is no debugging symbols. Note that
+#         if you include debugging then you should answer
+#         no when asked if you want to install the executables.
+#  
+#     --extra-debug: Enable extended debugging options
+#  
+#     --force: Overwrite a corrupted installation. 
+#  
+#     --fpe: Enable compiler-specific floating-point-exception
+#          handling procedures, if available.
+#  
+#     --gcc32: Use 3.2 version of GCC provided by the
+#          compat-gcc-32, compat-gcc-32-c++, compat-gcc-32-g77
+#          and compat-libf2c-32 packages.
+#  
+#     --gcc4: Use the GCC4 compilers (gcc, g++ and gFortran).
+#          NOTE: compilation of ESP-r with GCC4+ is not currently
+#          supported, and may introduce uncertianty into results.
+#          GCC4-builds of ESP-r should be used for testing purposes
+#          only.
+#  
+#     -h, --help:  Display this help message.
+#  
+#     --intel: Use the intel compiler suite (icc,ifort,icpc).
+#  
+#     --no_dbs: Skip installation of database files.
+#  
+#     --no_exes: Do not copy executable files into the
+#         installation directory.
+#  
+#     --no_training: Skip installation of training models.
+#  
+#     --skip_ish_calcs: Skip recalculation of shading files 
+#         associated with training and validation exemplars.
+#         This option significantly shortens the time required
+#         to install training and validation files, but shading
+#         files must be updated manually.
+#  
+#     --silent: Invoke the silent (non-interactive) installation
+#         mode. Default options will be selected, unless 
+#         alternatives are specified in command-line parameters.
+#  
+#     --X11, --GTK, --noX:
+#         Build ESP-r using the specified graphics library (that,
+#         is; X11, GTK or noX for a console-only application).
+#  
+#     --xml: Compile bps with support for direct export of results
+#         in xml and csv formats. Requires the GNU libxml2 and
+#         libstdc++ libraries.
+#  
+#     -v, --verbose: Print compilation messages to screen.
+#  
+#  Notes:
+#  
+#  1. While ESP-r compiles with the GCC 4 / gFortran compilers, the 
+#     results obtained with ESP-r binaries built with GCC4 exhibit 
+#     unexplained differences from the GCC3 versions. Until the 
+#     GCC4 results have been verified, use GCC3-built versions of 
+#     ESP-r for scientific research or consulting work.
+#  
+#  2. There are two versions of ESP-r - the standard full distribution
+#     based on the X11 graphic libraries and a beta version which uses the
+#     GTK graphic libraries (but which lacks a few facilities).
+#  
