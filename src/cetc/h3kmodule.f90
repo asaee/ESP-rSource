@@ -385,7 +385,8 @@ MODULE h3kmodule
       rvPltCHREMInstFuelFlowRt, rvPltCHREMInstFuelGrossEnInput, rvPltCHREMInstHeatLoss, rvElecCHREMNetGenOnsiteGeneration, &
       rvPltCHREMAvgHeatRec, rvPltCHREMOperModeInop, rvPltCHREMA42OperModeStartUp, rvPltCHREMOperModeWarmup, &
       rvPltCHREMOpenModeNormOper, rvPltCHREMOperModeShutdown, rvPltCHREMcondboilerfueluse, &
-      rvPltCHREMcondboilerfuelenergy, rvPltCHREMstrtank2HXQHX2, rvPltCHREMstrtank2HXQHX1, &
+      rvPltCHREMcondboilerfuelenergy, rvPltCHREMNcondboilerfueluse, rvPltCHREMNcondboilerfuelenergy, &
+      rvPltCHREMstrtank2HXQHX2, rvPltCHREMstrtank2HXQHX1, &
       rvPltCHREMstrtank2HXQ1, rvPltCHREMstrtanknHXQ1, rvPltCHREMstrtanknHXQ2, rvPltCHREMstrtank2HXTHX2, &
       rvPltCHREMstrtank2HXTINHX2
       
@@ -3899,6 +3900,12 @@ CONTAINS
       rvPltCHREMcondboilerfueluse%Description = 'Condensing boiler: Total amount of natural gas used.'
       Call AddVariable(rvPltCHREMcondboilerfueluse)
       
+      rvPltCHREMNcondboilerfueluse%VariableName = 'CHREM/SCD/use/non_condensing_boiler/src/oil/quantity'
+      rvPltCHREMNcondboilerfueluse%MetaType = 'units'
+      rvPltCHREMNcondboilerfueluse%VariableType = '(l/s)'
+      rvPltCHREMNcondboilerfueluse%Description = 'Non-Condensing boiler: Total amount of oil used.'
+      Call AddVariable(rvPltCHREMNcondboilerfueluse)
+
       rvTFuelCHREMQtyOil%VariableName = 'CHREM/SCD/use/*/src/oil/quantity'
       rvTFuelCHREMQtyOil%MetaType = 'units'
       rvTFuelCHREMQtyOil%VariableType = '(l/s)'
@@ -3958,6 +3965,12 @@ CONTAINS
       rvPltCHREMcondboilerfuelenergy%VariableType = '(W)'
       rvPltCHREMcondboilerfuelenergy%Description = 'Condensing boiler: Energy content of natural gas used.'
       Call AddVariable(rvPltCHREMcondboilerfuelenergy)
+
+      rvPltCHREMNcondboilerfuelenergy%VariableName = 'CHREM/SCD/use/non_condensing_boiler/src/oil/energy'
+      rvPltCHREMNcondboilerfuelenergy%MetaType = 'units'
+      rvPltCHREMNcondboilerfuelenergy%VariableType = '(W)'
+      rvPltCHREMNcondboilerfuelenergy%Description = 'Non-Condensing boiler: Energy content of oil used.'
+      Call AddVariable(rvPltCHREMNcondboilerfuelenergy)
 
       rvPltCHREMstrtanknHXQ1%VariableName = 'CHREM/SCD/use/STank_NOHX/src/energy/Q1'
       rvPltCHREMstrtanknHXQ1%MetaType = 'units'

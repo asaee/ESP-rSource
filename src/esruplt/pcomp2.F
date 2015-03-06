@@ -1412,13 +1412,25 @@ C Establish additional output variables
          PCAOUT(IPCOMP,5)=PHISB
 
 C-------------------------------------------------------------------
+C If the fuel is natural gas the heating value (J/m3) is around 3.8 * 10^7
+C and if the fuel is oil the heating value (J/m3) is around 3.8 * 10^10
+       IF (BDATA(IPCOMP,3) .LE. 3.8E8) THEN
 C...This line adds the condensing boiler fuel consumption for CHREM.         
-       call AddToReport(rvPltCHREMcondboilerfueluse%Identifier,
+           call AddToReport(rvPltCHREMcondboilerfueluse%Identifier,
      &          PCAOUT(IPCOMP,2))         
 
 C...This line adds the condensing boiler energy of consumed fuel for CHREM.         
-       call AddToReport(rvPltCHREMcondboilerfuelenergy%Identifier,
+           call AddToReport(rvPltCHREMcondboilerfuelenergy%Identifier,
      &          PCAOUT(IPCOMP,2)*BDATA(IPCOMP,3))         
+       ELSE
+C...This line adds the condensing boiler fuel consumption for CHREM.         
+           call AddToReport(rvPltCHREMNcondboilerfueluse%Identifier,
+     &          PCAOUT(IPCOMP,2)*1000.0)         
+
+C...This line adds the condensing boiler energy of consumed fuel for CHREM.         
+           call AddToReport(rvPltCHREMNcondboilerfuelenergy%Identifier,
+     &          PCAOUT(IPCOMP,2)*BDATA(IPCOMP,3))                
+       END IF
 
 C--------------------------------------------------------------------
 
