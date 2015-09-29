@@ -5541,7 +5541,7 @@ C            2 Model coef a0
 C            3 Model coef a1
 C            4 Model coef a2
 C	     5 Model coef a3
-C            6 Device power draw (kW) model [1 - fixed 2- polynomial]
+C            6 Device power draw (kW) model [1 - fixed 2- polynomial 3-exponential b0*e^(b1)]
 C            7 Model coef b0
 C            8 Model coef b1
 C            9 Model coef b2
@@ -5625,8 +5625,17 @@ C water outlet temperature and ambient temperature compensation can be applied [
 
       COMMON/ASHPvar3/CallforHeat,InDeadB,DefrostLock,InDefrost
 
+C Electrical details for specified plant components
+      common/pcelflg/ipcelf(mpcom)
+      common/elpcp/NPEL,PFP(mpcom),IPFP(mpcom),PWRP(mpcom),
+     &BVOLTP(mpcom),IPHP(mpcom)
+
       REAL SMALL
       PARAMETER (SMALL=1.0E-20)
+
+      REAL PFP,PWRP,BVOLTP,PWRQ,PA,PQ
+
+      INTEGER ipcelf,NPEL,IPFP,IPHP,IEMODEL
 
       LOGICAL CallforHeat,InDeadB,DefrostLock,InDefrost
 
@@ -5821,6 +5830,10 @@ C Calculate the TOTAL device power draw (W)
           Td=ReturnT
           Ta=Tamb
           CompPower=1000.*(Compa0+(Compa1*Ta)+(Compa2*Td))
+        ELSEIF(CompModel.eq.3)THEN
+          Td=ReturnT
+          Ta=Tamb
+          CompPower=1000.*Compa0*EXP(Compa1*(Td-Ta)) !exponential power consumption.
         ENDIF
         if(CompPower.LT.0.0)CompPower=0.0
 
@@ -5888,6 +5901,13 @@ C Establish heat loss modulus
 C Calculate the electrical demand of the device assumung the controller is ON.
         CtlPower=CtlRating
         TotRealPower=CompPower+CtlPower
+
+C Save the real power draw for use in an electrical power flow simulation. 
+         PWRP(IPCOMP)=-ABS(TotRealPower)
+         IEMODEL=1
+         CALL EMACH(IPCOMP,IEMODEL,PWRP(IPCOMP),PQ,PA)
+         PWRQ=PQ
+
 
 c Calculate the compressor power draw.
         CompressPower=CompPower-(PumpPower+FanPower+CtlPower)
