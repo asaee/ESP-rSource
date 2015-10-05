@@ -6019,7 +6019,27 @@ C-------------------------------------------------------------------------------
        call AddToReport(rvPltDefrostStat%Identifier,
      &         DefrostStat,
      &         pcname(IPCOMP)(1:IPCOMP_LEN))
+        
+C==============CHREM=================
+C Add required output to CHREM
+C====================================     
+       call AddToReport(rvPltCHREMRealPow%Identifier,
+     &         TotRealPower,
+     &         pcname(IPCOMP)(1:IPCOMP_LEN))
 
+       call AddToReport(rvPltCHREMRealPowQ%Identifier,
+     &         TotRealPower/3.6E6,
+     &         pcname(IPCOMP)(1:IPCOMP_LEN))
+
+        call AddToReport(rvPltCHREMReturnT%Identifier,
+     &         ReturnT,
+     &         pcname(IPCOMP)(1:IPCOMP_LEN))
+
+        call AddToReport(rvPltCHREMHOut%Identifier,
+     &         HeatOutput,
+     &         pcname(IPCOMP)(1:IPCOMP_LEN))
+
+C=====================================
 
 C 1st phase mass (ie. "water") balance coefficients
       ELSE IF(ISTATS.EQ.2) THEN

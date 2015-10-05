@@ -388,7 +388,7 @@ MODULE h3kmodule
       rvPltCHREMcondboilerfuelenergy, rvPltCHREMNcondboilerfueluse, rvPltCHREMNcondboilerfuelenergy, &
       rvPltCHREMstrtank2HXQHX2, rvPltCHREMstrtank2HXQHX1, &
       rvPltCHREMstrtank2HXQ1, rvPltCHREMstrtanknHXQ1, rvPltCHREMstrtanknHXQ2, rvPltCHREMstrtank2HXTHX2, &
-      rvPltCHREMstrtank2HXTINHX2
+      rvPltCHREMstrtank2HXTINHX2, rvPltCHREMRealPow, rvPltCHREMRealPowQ, rvPltCHREMReturnT, rvPltCHREMHOut
       
     !Used by CHREM_report_data.F
     Type(ReportVariable) :: rvZNAPAirSens, rvZNAPInfil, rvZNAPAmbVent, rvZNAPZnCpldVent, &
@@ -4115,6 +4115,31 @@ CONTAINS
       rvTEndUseCHREMEnergyEnd%VariableType = '(W)'
       rvTEndUseCHREMEnergyEnd%Description = 'Energy content used for Energy default.'
       Call AddVariable(rvTEndUseCHREMEnergyEnd)
+      
+      !Used by Air source heat pump
+      rvPltCHREMRealPow%VariableName = 'CHREM/SCD/use/*/src/electricity/energy'
+      rvPltCHREMRealPow%MetaType = 'units'
+      rvPltCHREMRealPow%VariableType = '(W)'
+      rvPltCHREMRealPow%Description = 'ASHP: Real Power Demand'
+      Call AddVariable(rvPltCHREMRealPow)
+
+      rvPltCHREMRealPowQ%VariableName = 'CHREM/SCD/use/*/src/electricity/quantity'
+      rvPltCHREMRealPowQ%MetaType = 'units'
+      rvPltCHREMRealPowQ%VariableType = '(kWh/s)'
+      rvPltCHREMRealPowQ%Description = 'ASHP: Total amount of electricity used'
+      Call AddVariable(rvPltCHREMRealPowQ)
+
+      rvPltCHREMReturnT%VariableName = 'CHREM/SCD/use/*/src/TR'
+      rvPltCHREMReturnT%MetaType = 'units'
+      rvPltCHREMReturnT%VariableType = '(degC)'
+      rvPltCHREMReturnT%Description = 'ASHP: Return Temp.'
+      Call AddVariable(rvPltCHREMReturnT)
+
+      rvPltCHREMHOut%VariableName = 'CHREM/SCD/use/*/src/Heat_Out/energy'
+      rvPltCHREMHOut%MetaType = 'units'
+      rvPltCHREMHOut%VariableType = '(W)'
+      rvPltCHREMHOut%Description = 'ASHP: Heat Output'
+      Call AddVariable(rvPltCHREMHOut)
 
       !Used by esruplt/Annex42_combustion_CHP.F
       rvPltCHREMAvgPowNet%VariableName = 'CHREM/SCD/gen/ICE/src/electricity/onsite_generation'
