@@ -2989,6 +2989,7 @@ C 4 - Cross flow with both fluids mixed
 C 5 - Cross flow with both fluids unmixed
 C 6 - Cross flow with Cmin unmixed
 C 7 - Cross flow with Cmax unmixed
+C 8 - CHREM - to be used in SAHP model
 C
 C Important assumptions made in the model are that the exchanger mass is small
 C compared to the mass of encapsulated fluids, it is also assumed that the
@@ -3059,13 +3060,27 @@ C and flows for iteration.
 C Generate coefficients for energy balance equation
       IF(ISTATS.EQ.1) THEN
 
+C Determine the flow regime operational within the heat exchanger.
+        IFLWR=INT(BDATA(IPCOMP,1))
+
 C Establish fluid thermal capacity rates. Assume the specific
 C heat of the combustion products is the following value.
 C Cp=1.17kJ/kgK Assuming 200% theoretical (stochiometric) air.
-        CW1=1170.0*ADATA(IPCOMP,1)
+        CW1=1170.*ADATA(IPCOMP,1)
         CW2=SHTFLD(3,CSVF(INOD2,1))*ADATA(IPCOMP,2)
-        C1=PCONDR(ICON1)*CONVAR(ICON1,2)*1170.0
+        C1=PCONDR(ICON1)*CONVAR(ICON1,2)*1170.
         C2=PCONDR(ICON2)*CONVAR(ICON2,2)*SHTFLD(3,CONVAR(ICON2,1))
+C CHREM: establish the flow regime for heat exchanger based on the 
+C actual air temperature        
+        IF (IFLWR.EQ.8) THEN
+	   CW1=SHTFLD(1,CSVF(INOD1,1))*ADATA(IPCOMP,1)
+	   CW2=SHTFLD(3,CSVF(INOD2,1))*ADATA(IPCOMP,2)
+	   C1=PCONDR(ICON1)*CONVAR(ICON1,2)*SHTFLD(1,CONVAR(ICON1,1))
+	   C2=PCONDR(ICON2)*CONVAR(ICON2,2)*SHTFLD(3,CONVAR(ICON2,1))
+	ENDIF
+        write(*,*) SHTFLD(1,CSVF(INOD1,1)), SHTFLD(3,CONVAR(ICON2,1)),
+     &   CONVAR(ICON1,1), CSVF(INOD1,1), CONVAR(ICON2,1), CSVF(INOD2,1),
+     &   "|", CONVAR(ICON1,2), CONVAR(ICON2,2)
 
 C Establish the overall K value
         K=ADATA(IPCOMP,3)*ADATA(IPCOMP,4)
@@ -3089,9 +3104,6 @@ C Find Cmin and Cmax
 C Determine the NTU's and the thermal capacities ratio TCRAT
         NTU=K/CMIN
         TCRAT=CMIN/CMAX
-
-C Determine the flow regime operational within the heat exchanger.
-        IFLWR=INT(BDATA(IPCOMP,1))
 
 C Establish the Effectiveness of the exchanger.
          IF(IFLWR.EQ.1) THEN
@@ -3125,16 +3137,20 @@ C Cross flow with both fluids unmixed.
 
 C Cross flow with CMIN=unmixed.
           A1=(1.-EXP(-NTU))
-          EFF=(1.- EXP(-TCRAT*A1))/TCRAT
+          EFF= (1.- EXP(-TCRAT*A1))/TCRAT
         ELSEIF(IFLWR.EQ.7) THEN
 C Cross flow with CMAX=unmixed.
 
           A1=(1.-EXP(-TCRAT*NTU))/TCRAT
           EFF=1.-EXP(-A1)
+        ELSEIF(IFLWR.EQ.8) THEN
+C CHREM: to be used in CHREM        
+	  EFF=1.
         ENDIF
 
 C Establish the heat flux transferred between the nodes.
-        HFLX=EFF*CMIN*(CONVAR(ICON2,1)-CONVAR(ICON1,1))
+        HFLX = EFF*CMIN*(CONVAR(ICON2,1)-CONVAR(ICON1,1))
+
   777   CONTINUE
         TDIF=AMAX1(CSVF(INOD1,1)-CSVF(INOD2,1),SMALL)
 C Calculate current component time-constant TC
@@ -3937,6 +3953,7 @@ C part of the conponent connected to conditioned air.
 C
 C
       SUBROUTINE CMP36C(IPCOMP,COUT,ISTATS)
+       use h3kmodule
 #include "plant.h"
 #include "building.h"
 
@@ -3966,9 +3983,13 @@ C
       COMMON/PCOND/CONVAR(MPCON,MCONVR),ICONTP(MPCON),
      &             ICONDX(MPCOM,MNODEC,MPCONC)
       COMMON/PCRES/QDATA(MPCOM),PCAOUT(MPCOM,MPCRES),napdat(mpcom)
+      common/pcnam/pcname(mpcom)
       REAL QDATA,PCAOUT
       INTEGER napdat
 
+      CHARACTER PCNAME*15
+      INTEGER lnblnk
+      INTEGER IPCOMP_LEN !lenght of ipcomp
 
 C Electrical details for specified plant components
       common/elpcp/NPEL,PFP(mpcom),IPFP(mpcom),PWRP(mpcom),
@@ -3984,6 +4005,8 @@ C Reversible heat pump common
       REAL      COUT(MPCOE)
 
       LOGICAL CLOSE
+      
+
 C Trace output
       IF(ITC.GT.0.AND.NSINC.GE.ITC.AND.NSINC.LE.ITCF.AND.
      &   ITRACE(37).NE.0) WRITE(ITU,*) ' Entering subroutine CMP36C'
@@ -4067,16 +4090,32 @@ C If zero flow found then set transfered flux to zero and skip.
 	  Q_water=0.
 	  Q_air=0.
 	  w_compressor=0.
+	  Q_min=0.
 	ELSE
 
 C Establish if heating or cooling
           if(heat_pump_duty.ge.0.)then
-	    if(COPh.gt.small) w_compressor=heat_pump_duty/COPh
+	    if(COPh.gt.small) w_compressor=heat_pump_duty/(COPh-1.0)
 
 C heating mode, heat removed from water + compressor work added to
 C air node.
 	    Q_air=heat_pump_duty+w_compressor
 	    Q_water=heat_pump_duty
+
+C If temperature of water (T_h) exceeds the air temperature (T_c), Following condition 
+C bypass the heat pump by converting it into a heat exchanger.
+	    if(T_h.gt.T_c) then
+	      Q_min = AMIN1(C1,C2)*(T_h-T_c)
+	      if (Q_air.lt.Q_min) then
+		w_compressor=0.0
+		Q_water = Q_min
+		Q_air = Q_water
+	      else
+		w_compressor = (Q_air-Q_min)/COPh
+		Q_water = Q_min+(Q_air-Q_min)*(COPh-1.0)/COPh
+	      endif
+	    endif
+
 	  else
 
 C cooling mode, heat removed from air + compressor work added to
@@ -4156,6 +4195,29 @@ C Addition output for results analysis.
          PCAOUT(IPCOMP,5)=COPh
          PCAOUT(IPCOMP,6)=COPc
 
+C-----------------------------------------------------
+C Make select results available in XML and CVS output.
+C-----------------------------------------------------
+
+	IPCOMP_LEN = lnblnk(pcname(IPCOMP))
+	
+	call AddToReport(rvPltCHREMrevHPQW%Identifier,
+     &         Q_water,
+     &         pcname(IPCOMP)(1:IPCOMP_LEN))
+
+	call AddToReport(rvPltCHREMrevHPQA%Identifier,
+     &         Q_air,
+     &         pcname(IPCOMP)(1:IPCOMP_LEN))
+
+	call AddToReport(rvPltCHREMrevHPWc%Identifier,
+     &         w_compressor,
+     &         pcname(IPCOMP)(1:IPCOMP_LEN))
+
+	call AddToReport(rvPltCHREMrevHPWcQ%Identifier,
+     &         w_compressor/3.6E6,
+     &         pcname(IPCOMP)(1:IPCOMP_LEN))
+
+C---------------------------------------------------
 C 1st phase mass (ie. "water") balance coefficients
 
       ELSE IF(ISTATS.EQ.2) THEN

@@ -1851,6 +1851,9 @@ C this line report the PV generation for CHREM
        Call AddToReport(rvBldCHREMSPMatlPVPow%Identifier,
      &         fPVPower)
 
+       Call AddToReport(rvBldCHREMSPMatlPVPGEN%Identifier,
+     &         fPVPower)
+
 C Trace output.
       if(itc.le.0.or.nsinc.lt.itc.or.ispmxist.eq.0)goto 999
       if(itrace(19).eq.0.or.nsinc.gt.itcf.or.

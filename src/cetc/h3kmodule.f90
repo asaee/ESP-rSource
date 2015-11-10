@@ -379,7 +379,7 @@ MODULE h3kmodule
       rvTFuelCHREMEnergyContHardWood, rvTFuelCHREMEnergyContSoftWood, rvTFuelCHREMEnergyContPellets, &
       rvTEndUseCHREMEnergyDHW, rvTEndUseCHREMEnergySH, rvTEndUseCHREMEnergySC, rvTEndUseCHREMEnergyLights, &
       rvTEndUseCHREMEnergyEqt, rvTEndUseCHREMEnergyHRV, rvTEndUseCHREMEnergyUnCat, rvTEndUseCHREMEnergyOther, &
-      rvTEndUseCHREMExBill, rvTEndUseCHREMEnergyEnd, rvBldCHREMSPMatlTtlIncTtl, rvBldCHREMSPMatlPVPow, &
+      rvTEndUseCHREMExBill, rvTEndUseCHREMEnergyEnd, rvBldCHREMSPMatlTtlIncTtl, rvBldCHREMSPMatlPVPow, rvBldCHREMSPMatlPVPGEN, &
       rvBndCndCHREMStpInt,rvBndCndCHREMLnInt, rvTEndUseCHREMEnergyAL, rvPltCHREMAvgPowNet, rvPltCHREMAvgEmisCarbDio, &
       rvPltCHREMAvgFuelFlowRt, rvElecCHREMNetGridNetBalance, rvPltCHREMAvgEffElec, rvPltCHREMInstPowerNet, &
       rvPltCHREMInstFuelFlowRt, rvPltCHREMInstFuelGrossEnInput, rvPltCHREMInstHeatLoss, rvElecCHREMNetGenOnsiteGeneration, &
@@ -388,7 +388,8 @@ MODULE h3kmodule
       rvPltCHREMcondboilerfuelenergy, rvPltCHREMNcondboilerfueluse, rvPltCHREMNcondboilerfuelenergy, &
       rvPltCHREMstrtank2HXQHX2, rvPltCHREMstrtank2HXQHX1, &
       rvPltCHREMstrtank2HXQ1, rvPltCHREMstrtanknHXQ1, rvPltCHREMstrtanknHXQ2, rvPltCHREMstrtank2HXTHX2, &
-      rvPltCHREMstrtank2HXTINHX2, rvPltCHREMRealPow, rvPltCHREMRealPowQ, rvPltCHREMReturnT, rvPltCHREMHOut
+      rvPltCHREMstrtank2HXTINHX2, rvPltCHREMRealPow, rvPltCHREMRealPowQ, rvPltCHREMReturnT, rvPltCHREMHOut, &
+      rvPltCHREMrevHPQW, rvPltCHREMrevHPQA, rvPltCHREMrevHPWc, rvPltCHREMrevHPWcQ
       
     !Used by CHREM_report_data.F
     Type(ReportVariable) :: rvZNAPAirSens, rvZNAPInfil, rvZNAPAmbVent, rvZNAPZnCpldVent, &
@@ -4140,6 +4141,31 @@ CONTAINS
       rvPltCHREMHOut%VariableType = '(W)'
       rvPltCHREMHOut%Description = 'ASHP: Heat Output'
       Call AddVariable(rvPltCHREMHOut)
+      
+      !Used by reversible water to air heat pump
+      rvPltCHREMrevHPWc%VariableName = 'CHREM/SCD/use/*/src/electricity/energy'
+      rvPltCHREMrevHPWc%MetaType = 'units'
+      rvPltCHREMrevHPWc%VariableType = '(W)'
+      rvPltCHREMrevHPWc%Description = 'Reversible HP: Power Demand'
+      Call AddVariable(rvPltCHREMrevHPWc)
+
+      rvPltCHREMrevHPWcQ%VariableName = 'CHREM/SCD/use/*/src/electricity/quantity'
+      rvPltCHREMrevHPWcQ%MetaType = 'units'
+      rvPltCHREMrevHPWcQ%VariableType = '(kWh/s)'
+      rvPltCHREMrevHPWcQ%Description = 'Reversible HP: Total amount of electricity used'
+      Call AddVariable(rvPltCHREMrevHPWcQ)
+
+      rvPltCHREMrevHPQW%VariableName = 'CHREM/SCD/use/*/src/Heat_water/energy'
+      rvPltCHREMrevHPQW%MetaType = 'units'
+      rvPltCHREMrevHPQW%VariableType = '(W)'
+      rvPltCHREMrevHPQW%Description = 'Reversible HP: Water Heat transfer'
+      Call AddVariable(rvPltCHREMrevHPQW)
+
+      rvPltCHREMrevHPQA%VariableName = 'CHREM/SCD/use/*/src/Heat_air/energy'
+      rvPltCHREMrevHPQA%MetaType = 'units'
+      rvPltCHREMrevHPQA%VariableType = '(W)'
+      rvPltCHREMrevHPQA%Description = 'Reversible HP: Air Heat transfer'
+      Call AddVariable(rvPltCHREMrevHPQA)
 
       !Used by esruplt/Annex42_combustion_CHP.F
       rvPltCHREMAvgPowNet%VariableName = 'CHREM/SCD/gen/ICE/src/electricity/onsite_generation'
@@ -4240,6 +4266,12 @@ CONTAINS
       rvBldCHREMSPMatlPVPow%VariableType = '(W)'
       rvBldCHREMSPMatlPVPow%Description = 'Power produced by PV module'
       Call AddVariable(rvBldCHREMSPMatlPVPow)
+
+      rvBldCHREMSPMatlPVPGEN%VariableName = 'CHREM/SCD/gen/PV/src/electricity/onsite_generation'
+      rvBldCHREMSPMatlPVPGEN%MetaType = 'units'
+      rvBldCHREMSPMatlPVPGEN%VariableType = '(W)'
+      rvBldCHREMSPMatlPVPGEN%Description = 'Onsite power produced by PV module'
+      Call AddVariable(rvBldCHREMSPMatlPVPGEN)
       
       !Used by BC_data.F
       rvBndCndCHREMStpInt%VariableName = 'CHREM/BCD/*/step_interpolation'
