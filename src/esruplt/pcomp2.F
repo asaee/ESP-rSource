@@ -3078,9 +3078,9 @@ C actual air temperature
 	   C1=PCONDR(ICON1)*CONVAR(ICON1,2)*SHTFLD(1,CONVAR(ICON1,1))
 	   C2=PCONDR(ICON2)*CONVAR(ICON2,2)*SHTFLD(3,CONVAR(ICON2,1))
 	ENDIF
-        write(*,*) SHTFLD(1,CSVF(INOD1,1)), SHTFLD(3,CONVAR(ICON2,1)),
-     &   CONVAR(ICON1,1), CSVF(INOD1,1), CONVAR(ICON2,1), CSVF(INOD2,1),
-     &   "|", CONVAR(ICON1,2), CONVAR(ICON2,2)
+C        write(*,*) SHTFLD(1,CSVF(INOD1,1)), SHTFLD(3,CONVAR(ICON2,1)),
+C     &   CONVAR(ICON1,1), CSVF(INOD1,1), CONVAR(ICON2,1), CSVF(INOD2,1),
+C     &   "|", CONVAR(ICON1,2), CONVAR(ICON2,2)
 
 C Establish the overall K value
         K=ADATA(IPCOMP,3)*ADATA(IPCOMP,4)
@@ -3150,6 +3150,11 @@ C CHREM: to be used in CHREM
 
 C Establish the heat flux transferred between the nodes.
         HFLX = EFF*CMIN*(CONVAR(ICON2,1)-CONVAR(ICON1,1))
+C CHREM: The minimum allowable air temperature is 50C.        
+        IF(IFLWR.EQ.8) THEN
+	  HFLX = EFF*C1*(50.-CONVAR(ICON1,1))
+	ENDIF
+	    
 
   777   CONTINUE
         TDIF=AMAX1(CSVF(INOD1,1)-CSVF(INOD2,1),SMALL)
@@ -4057,18 +4062,24 @@ C Establish the COP for heating mode if calculated using a quadratic
 	  h0=BDATA(IPCOMP,4)
 	  COPh=h2*T_h**2+h1*T_h+h0
 	endif
+	
+	IF(COPh.LT.1.0) COPh = 1.0
+	IF(COPh.GT.12.0) COPh = 12.0
 
 C Establish the COP for cooling mode
         COPc=BDATA(IPCOMP,5)
 
 C Establish the COP for heating mode if calculated using a quadratic
-        if(COPc.lt.0.)then
+        if(COPc.EQ.3.)then
 	  c2=BDATA(IPCOMP,6)
 	  c1=BDATA(IPCOMP,7)
 	  c0=BDATA(IPCOMP,8)
-	  T_c=CONVAR(ICON2,1)
-	  COPc=c2*T_c**2+c1*T_c+c0
+C	  T_c=CONVAR(ICON2,1)
+	  COPc=(c2*(T_h-T_c)**2.)+(c1*(T_h-T_c))+c0
 	endif
+C	write (*,*) COPc
+	IF(COPc.LT.0.0) COPc = 0.0
+	IF(COPc.GT.12.0) COPc = 12.0
 
 C Establish the heat pump duty cooling or heating
 C (heat to or from the air stream)
@@ -4083,6 +4094,7 @@ C Set default state (off)
 	w_compressor=0.
         Q_water=0.
 	Q_air=0.
+C	Q_min = AMIN1(C1,C2)*(T_h-T_c)
 
 C If zero flow found then set transfered flux to zero and skip.
         IF(C1.LT.SMALL.OR.C2.LT.SMALL) THEN
@@ -4090,39 +4102,51 @@ C If zero flow found then set transfered flux to zero and skip.
 	  Q_water=0.
 	  Q_air=0.
 	  w_compressor=0.
-	  Q_min=0.
+C	  Q_min=0.
 	ELSE
 
 C Establish if heating or cooling
           if(heat_pump_duty.ge.0.)then
-	    if(COPh.gt.small) w_compressor=heat_pump_duty/(COPh-1.0)
+	    if(COPh.gt.small) w_compressor=heat_pump_duty !/(COPh-1.0)
 
 C heating mode, heat removed from water + compressor work added to
 C air node.
-	    Q_air=heat_pump_duty+w_compressor
-	    Q_water=heat_pump_duty
+	    Q_air=heat_pump_duty*COPh !+w_compressor
+	    Q_water= Q_air-w_compressor !heat_pump_duty
 
 C If temperature of water (T_h) exceeds the air temperature (T_c), Following condition 
 C bypass the heat pump by converting it into a heat exchanger.
-	    if(T_h.gt.T_c) then
-	      Q_min = AMIN1(C1,C2)*(T_h-T_c)
-	      if (Q_air.lt.Q_min) then
-		w_compressor=0.0
-		Q_water = Q_min
-		Q_air = Q_water
-	      else
-		w_compressor = (Q_air-Q_min)/COPh
-		Q_water = Q_min+(Q_air-Q_min)*(COPh-1.0)/COPh
-	      endif
-	    endif
+C	    if(T_h.gt.T_c) then
+C	      Q_min = AMIN1(C1,C2)*(T_h-T_c)
+C	      if (Q_air.lt.Q_min) then
+C		w_compressor=0.0
+C		Q_water = Q_min
+C		Q_air = Q_water
+C	      else
+C		w_compressor = (Q_air-Q_min)/COPh
+C		Q_water = Q_min+(Q_air-Q_min)*(COPh-1.0)/COPh
+C	      endif
+C	    endif
 
 	  else
 
 C cooling mode, heat removed from air + compressor work added to
 C water node.
-	    if(COPc.gt.small) w_compressor=-heat_pump_duty/COPc
-	    Q_water=heat_pump_duty-w_compressor
-	    Q_air=heat_pump_duty
+C	    if(COPc.gt.small) then
+C	      w_compressor= -1.*heat_pump_duty*EXP(0.017*(T_h-T_c))
+C	      Q_water=-w_compressor*((BDATA(IPCOMP,6)
+C     &	      *(T_h-T_c)**2.)+(BDATA(IPCOMP,7)*(T_h-T_c))
+C     &	      +BDATA(IPCOMP,8))
+C------------------------------------------------------------
+	      w_compressor= -1. * heat_pump_duty/((BDATA(IPCOMP,6)
+     &	      *(T_h-T_c)**2.)+(BDATA(IPCOMP,7)*(T_h-T_c))
+     &	      +BDATA(IPCOMP,8)) !COPc)
+C	    endif
+	    Q_water=heat_pump_duty	!-w_compressor
+C	    write (*,*)T_h,T_c,w_compressor,Q_water
+C-----------------------------------------------------------------
+C	Q_water is a negative value and w_compressor is a positive. Thus their summation yields Q_air    
+	    Q_air=Q_water+w_compressor
 
 C Calculate effect of possible condensation here.
 C << to be added >>
@@ -4132,7 +4156,7 @@ C end condensation calc.
         ENDIF
 
 C Calculate the electrical demand of the components
-	PWRP(IPCOMP)=w_compressor
+	PWRP(IPCOMP)= -ABS(w_compressor)
         IEMODEL=1
         CALL EMACH(IPCOMP,IEMODEL,PWRP(IPCOMP),PQ,PA)
 
