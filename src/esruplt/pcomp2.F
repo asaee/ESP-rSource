@@ -5946,6 +5946,7 @@ C Calculate the COP based on the user-specified method.
 C Set limits on calculated values of COP
         IF(COP.LT.0.0) COP=0.0
         IF(COP.GT.12.0) COP=12.0
+        IF(Tamb.LT.-15.0) CompPower=0.0
 
         IF(InDefrost)THEN
           HeatOutput=0.0
