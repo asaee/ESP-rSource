@@ -5947,6 +5947,7 @@ C Set limits on calculated values of COP
         IF(COP.LT.0.0) COP=0.0
         IF(COP.GT.12.0) COP=12.0
         IF(Tamb.LT.-15.0) CompPower=0.0
+        IF(Tamb.LT.-15.0) FanPower=0.0
 
         IF(InDefrost)THEN
           HeatOutput=0.0
@@ -5987,7 +5988,7 @@ C Establish heat loss modulus
 
 C Calculate the electrical demand of the device assumung the controller is ON.
         CtlPower=CtlRating
-        TotRealPower=CompPower+CtlPower
+        TotRealPower=CompPower+CtlPower+FanPower+PumpPower
 
 C Save the real power draw for use in an electrical power flow simulation. 
          PWRP(IPCOMP)=-ABS(TotRealPower)
