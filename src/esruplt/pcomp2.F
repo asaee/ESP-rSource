@@ -5946,8 +5946,17 @@ C Calculate the COP based on the user-specified method.
 C Set limits on calculated values of COP
         IF(COP.LT.0.0) COP=0.0
         IF(COP.GT.12.0) COP=12.0
-        IF(Tamb.LT.-15.0) CompPower=0.0
-        IF(Tamb.LT.-15.0) FanPower=0.0
+C Set temperature limits on system operation
+        IF(Tamb.LT.ToutMax)THEN
+	    CompPower=0.0
+	    FanPower=0.0
+        ELSEIF(Tamb.GE.ToutMax.AND.Tamb.LT.0.0.AND.ReturnT.GE.50.0)THEN
+	    CompPower=0.0
+	    FanPower=0.0
+	ELSEIF(Tamb.GE.35.0)THEN
+	    CompPower=0.0
+	    FanPower=0.0
+	ENDIF
 
         IF(InDefrost)THEN
           HeatOutput=0.0
