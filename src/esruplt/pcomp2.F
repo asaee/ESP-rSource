@@ -1421,7 +1421,10 @@ C...This line adds the condensing boiler fuel consumption for CHREM.
 
 C...This line adds the condensing boiler energy of consumed fuel for CHREM.         
            call AddToReport(rvPltCHREMcondboilerfuelenergy%Identifier,
-     &          PCAOUT(IPCOMP,2)*BDATA(IPCOMP,3))         
+     &          PCAOUT(IPCOMP,2)*BDATA(IPCOMP,3)) 
+           
+           call AddToReport(rvPltCHREMcondboilerheat%Identifier,
+     &          Q)             
        ELSE
 C...This line adds the condensing boiler fuel consumption for CHREM.         
            call AddToReport(rvPltCHREMNcondboilerfueluse%Identifier,
@@ -1429,7 +1432,10 @@ C...This line adds the condensing boiler fuel consumption for CHREM.
 
 C...This line adds the condensing boiler energy of consumed fuel for CHREM.         
            call AddToReport(rvPltCHREMNcondboilerfuelenergy%Identifier,
-     &          PCAOUT(IPCOMP,2)*BDATA(IPCOMP,3))                
+     &          PCAOUT(IPCOMP,2)*BDATA(IPCOMP,3)) 
+
+           call AddToReport(rvPltCHREMNcondboilerheat%Identifier,
+     &          Q)               
        END IF
 
 C--------------------------------------------------------------------

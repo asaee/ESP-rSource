@@ -389,7 +389,8 @@ MODULE h3kmodule
       rvPltCHREMstrtank2HXQHX2, rvPltCHREMstrtank2HXQHX1, &
       rvPltCHREMstrtank2HXQ1, rvPltCHREMstrtanknHXQ1, rvPltCHREMstrtanknHXQ2, rvPltCHREMstrtank2HXTHX2, &
       rvPltCHREMstrtank2HXTINHX2, rvPltCHREMRealPow, rvPltCHREMRealPowQ, rvPltCHREMReturnT, rvPltCHREMHOut, &
-      rvPltCHREMrevHPQW, rvPltCHREMrevHPQA, rvPltCHREMrevHPWc, rvPltCHREMrevHPWcQ
+      rvPltCHREMrevHPQW, rvPltCHREMrevHPQA, rvPltCHREMrevHPWc, rvPltCHREMrevHPWcQ, rvPltCHREMcondboilerheat, &
+      rvPltCHREMNcondboilerheat
       
     !Used by CHREM_report_data.F
     Type(ReportVariable) :: rvZNAPAirSens, rvZNAPInfil, rvZNAPAmbVent, rvZNAPZnCpldVent, &
@@ -3966,6 +3967,12 @@ CONTAINS
       rvPltCHREMcondboilerfuelenergy%VariableType = '(W)'
       rvPltCHREMcondboilerfuelenergy%Description = 'Condensing boiler: Energy content of natural gas used.'
       Call AddVariable(rvPltCHREMcondboilerfuelenergy)
+      
+      rvPltCHREMcondboilerheat%VariableName = 'CHREM/SCD/use/condensing_boiler/src/Heat_Out/energy'
+      rvPltCHREMcondboilerheat%MetaType = 'units'
+      rvPltCHREMcondboilerheat%VariableType = '(W)'
+      rvPltCHREMcondboilerheat%Description = 'Condensing boiler: Heat out put of the boiler.'
+      Call AddVariable(rvPltCHREMcondboilerheat)
 
       rvPltCHREMNcondboilerfuelenergy%VariableName = 'CHREM/SCD/use/non_condensing_boiler/src/oil/energy'
       rvPltCHREMNcondboilerfuelenergy%MetaType = 'units'
@@ -3973,31 +3980,37 @@ CONTAINS
       rvPltCHREMNcondboilerfuelenergy%Description = 'Non-Condensing boiler: Energy content of oil used.'
       Call AddVariable(rvPltCHREMNcondboilerfuelenergy)
 
-      rvPltCHREMstrtanknHXQ1%VariableName = 'CHREM/SCD/use/STank_NOHX/src/energy/Q1'
+      rvPltCHREMNcondboilerheat%VariableName = 'CHREM/SCD/use/non_condensing_boiler/src/Heat_out/energy'
+      rvPltCHREMNcondboilerheat%MetaType = 'units'
+      rvPltCHREMNcondboilerheat%VariableType = '(W)'
+      rvPltCHREMNcondboilerheat%Description = 'Non-Condensing boiler: Heat out put of the boiler.'
+      Call AddVariable(rvPltCHREMNcondboilerheat)
+
+      rvPltCHREMstrtanknHXQ1%VariableName = 'CHREM/SCD/use/STank_NOHX/src/Q1/energy'
       rvPltCHREMstrtanknHXQ1%MetaType = 'units'
       rvPltCHREMstrtanknHXQ1%VariableType = '(W)'
       rvPltCHREMstrtanknHXQ1%Description = 'Stratified tank : Energy delivered to first node of the tank.'
       Call AddVariable(rvPltCHREMstrtanknHXQ1)
 
-      rvPltCHREMstrtanknHXQ2%VariableName = 'CHREM/SCD/use/STank_NOHX/src/energy/Q2'
+      rvPltCHREMstrtanknHXQ2%VariableName = 'CHREM/SCD/use/STank_NOHX/src/Q2/energy'
       rvPltCHREMstrtanknHXQ2%MetaType = 'units'
       rvPltCHREMstrtanknHXQ2%VariableType = '(W)'
       rvPltCHREMstrtanknHXQ2%Description = 'Stratified tank : Energy delivered to SECOND node of the tank.'
       Call AddVariable(rvPltCHREMstrtanknHXQ2)
 
-      rvPltCHREMstrtank2HXQ1%VariableName = 'CHREM/SCD/use/STank_2HX/src/energy/Q1'
+      rvPltCHREMstrtank2HXQ1%VariableName = 'CHREM/SCD/use/STank_2HX/src/Q1/energy'
       rvPltCHREMstrtank2HXQ1%MetaType = 'units'
       rvPltCHREMstrtank2HXQ1%VariableType = '(W)'
       rvPltCHREMstrtank2HXQ1%Description = 'Stratified tank : Energy delivered to first node of the tank.'
       Call AddVariable(rvPltCHREMstrtank2HXQ1)
 
-      rvPltCHREMstrtank2HXQHX1%VariableName = 'CHREM/SCD/use/STank_2HX/src/energy/QHX1'
+      rvPltCHREMstrtank2HXQHX1%VariableName = 'CHREM/SCD/use/STank_2HX/src/QHX1/energy'
       rvPltCHREMstrtank2HXQHX1%MetaType = 'units'
       rvPltCHREMstrtank2HXQHX1%VariableType = '(W)'
       rvPltCHREMstrtank2HXQHX1%Description = 'Stratified tank : Energy delivered to first immeresed HX.'
       Call AddVariable(rvPltCHREMstrtank2HXQHX1)
 
-      rvPltCHREMstrtank2HXQHX2%VariableName = 'CHREM/SCD/use/STank_2HX/src/energy/QHX2'
+      rvPltCHREMstrtank2HXQHX2%VariableName = 'CHREM/SCD/use/STank_2HX/src/QHX2/energy'
       rvPltCHREMstrtank2HXQHX2%MetaType = 'units'
       rvPltCHREMstrtank2HXQHX2%VariableType = '(W)'
       rvPltCHREMstrtank2HXQHX2%Description = 'Stratified tank : Energy delivered to second immeresed HX.'
