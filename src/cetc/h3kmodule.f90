@@ -386,11 +386,10 @@ MODULE h3kmodule
       rvPltCHREMAvgHeatRec, rvPltCHREMOperModeInop, rvPltCHREMA42OperModeStartUp, rvPltCHREMOperModeWarmup, &
       rvPltCHREMOpenModeNormOper, rvPltCHREMOperModeShutdown, rvPltCHREMcondboilerfueluse, &
       rvPltCHREMcondboilerfuelenergy, rvPltCHREMNcondboilerfueluse, rvPltCHREMNcondboilerfuelenergy, &
-      rvPltCHREMstrtank2HXQHX2, rvPltCHREMstrtank2HXQHX1, &
+      rvPltCHREMstrtank2HXQHX2, rvPltCHREMstrtank2HXQHX1, rvPltCHREMNcondboilerheat, &
       rvPltCHREMstrtank2HXQ1, rvPltCHREMstrtanknHXQ1, rvPltCHREMstrtanknHXQ2, rvPltCHREMstrtank2HXTHX2, &
       rvPltCHREMstrtank2HXTINHX2, rvPltCHREMRealPow, rvPltCHREMRealPowQ, rvPltCHREMReturnT, rvPltCHREMHOut, &
-      rvPltCHREMrevHPQW, rvPltCHREMrevHPQA, rvPltCHREMrevHPWc, rvPltCHREMrevHPWcQ, rvPltCHREMcondboilerheat, &
-      rvPltCHREMNcondboilerheat
+      rvPltCHREMrevHPQW, rvPltCHREMrevHPQA, rvPltCHREMrevHPWc, rvPltCHREMrevHPWcQ, rvPltCHREMcondboilerheat
       
     !Used by CHREM_report_data.F
     Type(ReportVariable) :: rvZNAPAirSens, rvZNAPInfil, rvZNAPAmbVent, rvZNAPZnCpldVent, &
@@ -3980,7 +3979,7 @@ CONTAINS
       rvPltCHREMNcondboilerfuelenergy%Description = 'Non-Condensing boiler: Energy content of oil used.'
       Call AddVariable(rvPltCHREMNcondboilerfuelenergy)
 
-      rvPltCHREMNcondboilerheat%VariableName = 'CHREM/SCD/use/non_condensing_boiler/src/Heat_out/energy'
+      rvPltCHREMNcondboilerheat%VariableName = 'CHREM/SCD/use/non_condensing_boiler/src/Heat_Out/energy'
       rvPltCHREMNcondboilerheat%MetaType = 'units'
       rvPltCHREMNcondboilerheat%VariableType = '(W)'
       rvPltCHREMNcondboilerheat%Description = 'Non-Condensing boiler: Heat out put of the boiler.'
