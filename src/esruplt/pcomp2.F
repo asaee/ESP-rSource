@@ -4066,7 +4066,11 @@ C Establish the COP for heating mode if calculated using a quadratic
 	  h2=BDATA(IPCOMP,2)
 	  h1=BDATA(IPCOMP,3)
 	  h0=BDATA(IPCOMP,4)
-	  COPh=h2*T_h**2+h1*T_h+h0
+	  IF(T_h.GT.30.)THEN
+	      COPh=h2*30.**2+h1*30.+h0	
+	  Else
+	      COPh=h2*T_h**2+h1*T_h+h0
+	  ENDIF
 	endif
 	
 	IF(COPh.LT.1.0) COPh = 1.0
@@ -4103,7 +4107,7 @@ C Set default state (off)
 C	Q_min = AMIN1(C1,C2)*(T_h-T_c)
 
 C If zero flow found then set transfered flux to zero and skip.
-        IF(C1.LT.SMALL.OR.C2.LT.SMALL) THEN
+        IF(C1.LT.SMALL.OR.C2.LT.SMALL.OR.T_h.LT.3.OR.T_h.GT.55) THEN
           heat_pump_duty=0.
 	  Q_water=0.
 	  Q_air=0.
@@ -4113,11 +4117,11 @@ C	  Q_min=0.
 
 C Establish if heating or cooling
           if(heat_pump_duty.ge.0.)then
-	    if(COPh.gt.small) w_compressor=heat_pump_duty !/(COPh-1.0)
+	    if(COPh.gt.small) w_compressor=heat_pump_duty/COPh !/(COPh-1.0)
 
 C heating mode, heat removed from water + compressor work added to
 C air node.
-	    Q_air=heat_pump_duty*COPh !+w_compressor
+	    Q_air=heat_pump_duty !*COPh !+w_compressor
 	    Q_water= Q_air-w_compressor !heat_pump_duty
 
 C If temperature of water (T_h) exceeds the air temperature (T_c), Following condition 
