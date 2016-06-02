@@ -4107,7 +4107,8 @@ C Set default state (off)
 C	Q_min = AMIN1(C1,C2)*(T_h-T_c)
 
 C If zero flow found then set transfered flux to zero and skip.
-        IF(C1.LT.SMALL.OR.C2.LT.SMALL.OR.T_h.LT.3.OR.T_h.GT.55) THEN
+        IF(C1.LT.SMALL.OR.C2.LT.SMALL.OR.T_h.LT.3
+     &   .OR.T_h.GT.55.OR.T_c.LT.-15) THEN
           heat_pump_duty=0.
 	  Q_water=0.
 	  Q_air=0.
@@ -4148,9 +4149,15 @@ C	      Q_water=-w_compressor*((BDATA(IPCOMP,6)
 C     &	      *(T_h-T_c)**2.)+(BDATA(IPCOMP,7)*(T_h-T_c))
 C     &	      +BDATA(IPCOMP,8))
 C------------------------------------------------------------
-	      w_compressor= -1. * heat_pump_duty/((BDATA(IPCOMP,6)
-     &	      *(T_h-T_c)**2.)+(BDATA(IPCOMP,7)*(T_h-T_c))
-     &	      +BDATA(IPCOMP,8)) !COPc)
+	      IF(T_c.LT.35)THEN
+	      	      w_compressor= -1. * heat_pump_duty/((BDATA(IPCOMP,6)
+     &	      	      *(T_h-T_c)**2.)+(BDATA(IPCOMP,7)*(T_h-T_c))
+     &	      	      +BDATA(IPCOMP,8)) !COPc)
+     	      ELSE
+     	      	      w_compressor= -1. * heat_pump_duty/((BDATA(IPCOMP,6)
+     &	      	      *(T_h-35)**2.)+(BDATA(IPCOMP,7)*(T_h-35))
+     &	      	      +BDATA(IPCOMP,8)) !COPc)
+     	      ENDIF
 C	    endif
 	    Q_water=heat_pump_duty	!-w_compressor
 C	    write (*,*)T_h,T_c,w_compressor,Q_water
